@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 1,
+            "activePatchIndex": 2,
             "patches": [
                 {
                     "date": 1778167597066,
@@ -12,6 +12,10 @@
                 {
                     "date": 1778172344122,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -13,5 +13,6 @@\n   appId: \"1:60199255400:web:9d957c53743a7f2ac32add\"\n };\n \n // Initialize Firebase\n-const app = initializeApp(firebaseConfig);\n\\ No newline at end of file\n+const app = initializeApp(firebaseConfig);\n+export const db = getFirestore(app);\n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1778172559307,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -14,5 +14,7 @@\n };\n \n // Initialize Firebase\n const app = initializeApp(firebaseConfig);\n-export const db = getFirestore(app);\n\\ No newline at end of file\n+export const db = getFirestore(app);\n+export const auth = getAuth(app);\n+export const storage = getStorage(app);\n\\ No newline at end of file\n"
                 }
             ],
             "date": 1778167597066,
