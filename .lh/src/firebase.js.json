@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 2,
+            "activePatchIndex": 4,
             "patches": [
                 {
                     "date": 1778167597066,
@@ -16,6 +16,14 @@
                 {
                     "date": 1778172559307,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -14,5 +14,7 @@\n };\n \n // Initialize Firebase\n const app = initializeApp(firebaseConfig);\n-export const db = getFirestore(app);\n\\ No newline at end of file\n+export const db = getFirestore(app);\n+export const auth = getAuth(app);\n+export const storage = getStorage(app);\n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1778172812919,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,6 +1,7 @@\n // Import the functions you need from the SDKs you need\n import { initializeApp } from \"firebase/app\";\n+import { getFirestore } from \"firebase/firestore\";\n // TODO: Add SDKs for Firebase products that you want to use\n // https://firebase.google.com/docs/web/setup#available-libraries\n \n // Your web app's Firebase configuration\n"
+                },
+                {
+                    "date": 1778172821056,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,7 +1,9 @@\n // Import the functions you need from the SDKs you need\n import { initializeApp } from \"firebase/app\";\n import { getFirestore } from \"firebase/firestore\";\n+import { getAuth } from \"firebase/auth\";\n+import { getStorage } from \"firebase/storage\";\n // TODO: Add SDKs for Firebase products that you want to use\n // https://firebase.google.com/docs/web/setup#available-libraries\n \n // Your web app's Firebase configuration\n"
                 }
             ],
             "date": 1778167597066,
