@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../firebase.js';
-import { collection, onSnapshot, query, where, doc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { format, addDays, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Sparkles, Camera, Crown, Clock, ChevronLeft, ChevronRight, MessageCircle, CreditCard, Check, Wand2 } from 'lucide-react';
@@ -39,6 +39,8 @@ const SERVICES = [
   },
 ];
 
+const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+
 const STEPS = [
   { n: 1, label: 'Prestation' },
   { n: 2, label: 'Date & Heure' },
@@ -53,66 +55,35 @@ export default function Booking() {
   const [selectedTime, setSelectedTime] = useState(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  // availability: { [dateStr]: string[] }  →  map of date → open slots
-  const [availability, setAvailability] = useState({});
-  // bookedSlots for selected date
-  const [bookedSlots, setBookedSlots] = useState([]);
+  const [availableDates, setAvailableDates] = useState([]);
+  const [blockedSlots, setBlockedSlots] = useState([]);
   const [weekOffset, setWeekOffset] = useState(0);
 
   const visibleDays = Array.from({ length: 7 }, (_, i) =>
     addDays(new Date(), weekOffset * 7 + i + 1)
   );
 
-  // Listen to availability collection (real-time)
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'availability'), (snap) => {
-      const map = {};
-      snap.docs.forEach(d => {
-        // Only include dates that have at least one slot
-        if (d.data().slots && d.data().slots.length > 0) {
-          map[d.id] = d.data().slots;
-        }
-      });
-      setAvailability(map);
+      const dates = snap.docs
+        .filter(d => d.data().available === true)
+        .map(d => new Date(d.data().date));
+      setAvailableDates(dates);
     }, () => {});
     return unsub;
   }, []);
 
-  // Listen to bookings for the selected date (real-time)
   useEffect(() => {
-    if (!selectedDate) {
-      setBookedSlots([]);
-      return;
-    }
+    if (!selectedDate) return;
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const q = query(
-      collection(db, 'bookings'),
-      where('date', '==', dateStr),
-    );
+    const q = query(collection(db, 'bookings'), where('date', '==', dateStr));
     const unsub = onSnapshot(q, (snap) => {
-      // Only count active bookings (not cancelled)
-      setBookedSlots(
-        snap.docs
-          .filter(d => d.data().status !== 'cancelled')
-          .map(d => d.data().time)
-      );
+      setBlockedSlots(snap.docs.map(d => d.data().time));
     }, () => {});
     return unsub;
   }, [selectedDate]);
 
-  const isDateAvailable = (date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    return !!availability[dateStr] && availability[dateStr].length > 0;
-  };
-
-  // Get available (open AND not booked) slots for selected date
-  const getAvailableSlots = () => {
-    if (!selectedDate) return [];
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return availability[dateStr] || [];
-  };
-
-  const isSlotBooked = (slot) => bookedSlots.includes(slot);
+  const isDateAvailable = (date) => availableDates.some(d => isSameDay(d, date));
 
   const handleWhatsApp = () => {
     const service = SERVICES.find(s => s.id === selectedService);
@@ -121,8 +92,7 @@ export default function Booking() {
 `MAGICAL HAND BY MAMIFA
 Studio de Maquillage Professionnel_
 NOUVELLE RÉSERVATION
-Nom:${name}
-Numéro de téléphone ${phone ? `\n${phone}` : ''}
+${name}${phone ? `\n${phone}` : ''}
 ${service.label}
  ${service.price}
 🗓${dateStr}
@@ -139,8 +109,6 @@ Merci de votre confiance `;
     if (step === 3) return name.trim().length > 2;
     return false;
   };
-
-  const openSlots = getAvailableSlots();
 
   return (
     <section id="reserver" className="booking-section">
@@ -292,6 +260,7 @@ Merci de votre confiance `;
                         width: '100%',
                       }}
                     >
+                      {/* Top row: icon + label */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{
                           width: '40px',
@@ -306,7 +275,11 @@ Merci de votre confiance `;
                           flexShrink: 0,
                           transition: 'all 0.3s',
                         }}>
-                          <Icon size={18} strokeWidth={1.5} color={active ? '#0A0A0A' : '#C9A84C'} />
+                          <Icon
+                            size={18}
+                            strokeWidth={1.5}
+                            color={active ? '#0A0A0A' : '#C9A84C'}
+                          />
                         </div>
                         <div style={{
                           fontFamily: 'Jost, sans-serif',
@@ -319,6 +292,8 @@ Merci de votre confiance `;
                           {s.label}
                         </div>
                       </div>
+
+                      {/* Bottom row: description + price */}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '10px', paddingLeft: '52px' }}>
                         <div style={{
                           fontFamily: 'Jost, sans-serif',
@@ -366,7 +341,7 @@ Merci de votre confiance `;
                 Seules les dates dorées sont disponibles
               </p>
 
-              {/* Week navigation */}
+              {/* Week navigation row (above the grid) */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -380,8 +355,11 @@ Merci de votre confiance `;
                     background: 'transparent',
                     border: '1px solid rgba(201,168,76,0.25)',
                     borderRadius: '50%',
-                    width: '32px', height: '32px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     cursor: weekOffset === 0 ? 'not-allowed' : 'pointer',
                     opacity: weekOffset === 0 ? 0.3 : 1,
                     transition: 'all 0.2s',
@@ -408,8 +386,11 @@ Merci de votre confiance `;
                     background: 'transparent',
                     border: '1px solid rgba(201,168,76,0.25)',
                     borderRadius: '50%',
-                    width: '32px', height: '32px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '32px',
+                    height: '32px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     cursor: weekOffset >= 3 ? 'not-allowed' : 'pointer',
                     opacity: weekOffset >= 3 ? 0.3 : 1,
                     transition: 'all 0.2s',
@@ -420,7 +401,7 @@ Merci de votre confiance `;
                 </button>
               </div>
 
-              {/* 7-day grid */}
+              {/* 7-day grid — pleine largeur */}
               <div style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
@@ -429,11 +410,6 @@ Merci de votre confiance `;
                 {visibleDays.map((date) => {
                   const avail = isDateAvailable(date);
                   const sel = selectedDate && isSameDay(date, selectedDate);
-                  const dateStr = format(date, 'yyyy-MM-dd');
-                  const daySlots = availability[dateStr] || [];
-                  // Count remaining free slots for this day
-                  const freeCount = daySlots.filter(s => !bookedSlots.includes(s) || !isSameDay(date, selectedDate)).length;
-
                   return (
                     <motion.button
                       key={date.toISOString()}
@@ -488,22 +464,12 @@ Merci de votre confiance `;
                       }}>
                         {format(date, 'MMM', { locale: fr })}
                       </span>
-                      {avail && (
-                        <span style={{
-                          fontFamily: 'Jost, sans-serif',
-                          fontSize: '7px',
-                          color: sel ? '#0A0A0A' : '#C9A84C',
-                          opacity: 0.75,
-                        }}>
-                          {daySlots.length} cr.
-                        </span>
-                      )}
                     </motion.button>
                   );
                 })}
               </div>
 
-              {/* Time slots — only slots opened by admin */}
+              {/* Time slots */}
               {selectedDate && (
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: '28px' }}>
                   <p style={{
@@ -520,53 +486,41 @@ Merci de votre confiance `;
                     <Clock size={13} color="#C9A84C" />
                     Créneaux disponibles
                   </p>
-
-                  {openSlots.length === 0 ? (
-                    <p style={{
-                      fontFamily: 'Jost, sans-serif',
-                      fontSize: '13px',
-                      color: '#8A7968',
-                      fontStyle: 'italic',
-                    }}>
-                      Aucun créneau disponible pour cette date.
-                    </p>
-                  ) : (
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {openSlots.map((t) => {
-                        const blocked = isSlotBooked(t);
-                        const sel = selectedTime === t;
-                        return (
-                          <motion.button
-                            key={t}
-                            disabled={blocked}
-                            onClick={() => setSelectedTime(t)}
-                            whileHover={!blocked ? { scale: 1.06 } : {}}
-                            style={{
-                              padding: '9px 14px',
-                              background: sel
-                                ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
-                                : 'transparent',
-                              border: sel
-                                ? '1px solid #C9A84C'
-                                : blocked
-                                  ? '1px solid rgba(255,255,255,0.05)'
-                                  : '1px solid rgba(201,168,76,0.3)',
-                              borderRadius: '4px',
-                              fontFamily: 'Jost, sans-serif',
-                              fontSize: '13px',
-                              color: sel ? '#0A0A0A' : blocked ? '#3A3A3A' : '#FAF6EF',
-                              cursor: blocked ? 'not-allowed' : 'pointer',
-                              opacity: blocked ? 0.3 : 1,
-                              transition: 'all 0.2s',
-                              textDecoration: blocked ? 'line-through' : 'none',
-                            }}
-                          >
-                            {t}
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    {TIME_SLOTS.map((t) => {
+                      const blocked = blockedSlots.includes(t);
+                      const sel = selectedTime === t;
+                      return (
+                        <motion.button
+                          key={t}
+                          disabled={blocked}
+                          onClick={() => setSelectedTime(t)}
+                          whileHover={!blocked ? { scale: 1.06 } : {}}
+                          style={{
+                            padding: '9px 14px',
+                            background: sel
+                              ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
+                              : 'transparent',
+                            border: sel
+                              ? '1px solid #C9A84C'
+                              : blocked
+                                ? '1px solid rgba(255,255,255,0.05)'
+                                : '1px solid rgba(201,168,76,0.3)',
+                            borderRadius: '4px',
+                            fontFamily: 'Jost, sans-serif',
+                            fontSize: '13px',
+                            color: sel ? '#0A0A0A' : blocked ? '#3A3A3A' : '#FAF6EF',
+                            cursor: blocked ? 'not-allowed' : 'pointer',
+                            opacity: blocked ? 0.3 : 1,
+                            transition: 'all 0.2s',
+                            textDecoration: blocked ? 'line-through' : 'none',
+                          }}
+                        >
+                          {t}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
                 </motion.div>
               )}
             </div>

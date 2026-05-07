@@ -4,17 +4,15 @@ import { auth, db, storage } from '../firebase.js';
 import { signOut } from 'firebase/auth';
 import {
   collection, addDoc, deleteDoc, doc, onSnapshot,
-  query, orderBy, updateDoc, serverTimestamp, setDoc, getDoc
+  query, orderBy, updateDoc, serverTimestamp
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Clock, X } from 'lucide-react';
 
-const CATEGORIES = ['Glam', 'Cérémonie', 'Naturel'];
-const ALL_SLOTS = ['08:00', '09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+const CATEGORIES = ['Glam', 'Cérémonie', 'Naturel',];
 
 const TAB_STYLE = (active) => ({
   padding: '12px 24px',
@@ -34,22 +32,14 @@ const TAB_STYLE = (active) => ({
 export default function Admin() {
   const [tab, setTab] = useState('disponibilites');
   const [photos, setPhotos] = useState([]);
-  // availability: { [dateStr]: { slots: string[], bookedSlots: string[] } }
-  const [availability, setAvailability] = useState({});
+  const [availability, setAvailability] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [newPhotoTitle, setNewPhotoTitle] = useState('');
   const [newPhotoCategory, setNewPhotoCategory] = useState('Glam');
   const [selectedFile, setSelectedFile] = useState(null);
-  // Calendar navigation
-  const [calOffset, setCalOffset] = useState(0); // week offset
-  // Selected day for slot editing
-  const [editingDate, setEditingDate] = useState(null);
   const fileRef = useRef();
   const navigate = useNavigate();
-
-  const next28Days = Array.from({ length: 28 }, (_, i) => addDays(new Date(), i + 1));
-  const visibleWeek = Array.from({ length: 7 }, (_, i) => addDays(new Date(), calOffset * 7 + i + 1));
 
   // Firestore listeners
   useEffect(() => {
@@ -58,14 +48,9 @@ export default function Admin() {
       snap => setPhotos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       () => {}
     );
-    // Listen to availability collection: each doc id = dateStr, fields: slots[]
-    const unsubAvail = onSnapshot(collection(db, 'availability'), snap => {
-      const map = {};
-      snap.docs.forEach(d => {
-        map[d.id] = d.data(); // { slots: [...], ... }
-      });
-      setAvailability(map);
-    }, () => {});
+    const unsubAvail = onSnapshot(collection(db, 'availability'), snap =>
+      setAvailability(snap.docs.map(d => ({ id: d.id, ...d.data() }))), () => {}
+    );
     const unsubBook = onSnapshot(
       query(collection(db, 'bookings'), orderBy('createdAt', 'desc')),
       snap => setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
@@ -122,50 +107,26 @@ export default function Admin() {
   };
 
   // ---- AVAILABILITY ----
-  // Get slots configured for a date
-  const getSlotsForDate = (dateStr) => availability[dateStr]?.slots || [];
+  const next60Days = Array.from({ length: 60 }, (_, i) => addDays(new Date(), i + 1));
 
-  // Get booked slots for a date (from bookings collection)
-  const getBookedSlotsForDate = (dateStr) =>
-    bookings.filter(b => b.date === dateStr && b.status !== 'cancelled').map(b => b.time);
+  const getAvailDoc = (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return availability.find(a => a.date === dateStr);
+  };
 
-  // Toggle a specific slot for a date
-  const toggleSlot = async (dateStr, slot) => {
-    const current = getSlotsForDate(dateStr);
-    let updated;
-    if (current.includes(slot)) {
-      updated = current.filter(s => s !== slot);
+  const toggleDate = async (date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const existing = availability.find(a => a.date === dateStr);
+    if (existing) {
+      await deleteDoc(doc(db, 'availability', existing.id));
     } else {
-      updated = [...current, slot].sort();
-    }
-    if (updated.length === 0) {
-      // Remove the doc entirely if no slots remain
-      await deleteDoc(doc(db, 'availability', dateStr)).catch(() => {});
-    } else {
-      await setDoc(doc(db, 'availability', dateStr), {
-        slots: updated,
-        updatedAt: serverTimestamp(),
+      await addDoc(collection(db, 'availability'), {
+        date: dateStr,
+        available: true,
+        createdAt: serverTimestamp(),
       });
     }
   };
-
-  // Toggle all slots for a date
-  const toggleAllSlots = async (dateStr) => {
-    const current = getSlotsForDate(dateStr);
-    if (current.length === ALL_SLOTS.length) {
-      // Remove all
-      await deleteDoc(doc(db, 'availability', dateStr)).catch(() => {});
-    } else {
-      await setDoc(doc(db, 'availability', dateStr), {
-        slots: [...ALL_SLOTS],
-        updatedAt: serverTimestamp(),
-      });
-    }
-  };
-
-  // Count total available slots across all dates
-  const totalAvailableSlots = Object.values(availability).reduce((acc, d) => acc + (d.slots?.length || 0), 0);
-  const totalAvailableDays = Object.keys(availability).length;
 
   // ---- BOOKINGS ----
   const updateBookingStatus = async (id, status) => {
@@ -251,7 +212,7 @@ export default function Admin() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginBottom: '40px' }}>
           {[
             { label: 'Photos publiées', value: photos.length, color: '#C9A84C' },
-            { label: 'Créneaux ouverts', value: totalAvailableSlots, sub: `${totalAvailableDays} jour${totalAvailableDays > 1 ? 's' : ''}`, color: '#E8C97A' },
+            { label: 'Dates disponibles', value: availability.length, color: '#E8C97A' },
             { label: 'Réservations', value: bookings.length, color: '#D4956A' },
           ].map((stat) => (
             <div key={stat.label} style={{
@@ -265,17 +226,8 @@ export default function Admin() {
                 fontSize: '48px',
                 color: stat.color,
                 lineHeight: 1,
-                marginBottom: '4px',
+                marginBottom: '8px',
               }}>{stat.value}</div>
-              {stat.sub && (
-                <div style={{
-                  fontFamily: 'Jost, sans-serif',
-                  fontSize: '10px',
-                  color: stat.color,
-                  opacity: 0.6,
-                  marginBottom: '4px',
-                }}>{stat.sub}</div>
-              )}
               <div style={{
                 fontFamily: 'Jost, sans-serif',
                 fontSize: '11px',
@@ -321,59 +273,11 @@ export default function Admin() {
                 color: '#8A7968',
                 marginBottom: '32px',
               }}>
-                Cliquez sur un jour pour sélectionner les créneaux horaires disponibles. Les créneaux dorés sont ouverts à la réservation.
+                Cliquez sur une date pour l'activer (dorée = disponible). Les clientes pourront réserver sur ces dates.
               </p>
 
-              {/* Week navigation */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '16px',
-              }}>
-                <button
-                  onClick={() => setCalOffset(Math.max(0, calOffset - 1))}
-                  disabled={calOffset === 0}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid rgba(201,168,76,0.25)',
-                    borderRadius: '50%',
-                    width: '32px', height: '32px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: calOffset === 0 ? 'not-allowed' : 'pointer',
-                    opacity: calOffset === 0 ? 0.3 : 1,
-                  }}
-                >
-                  <ChevronLeft size={15} color="#C9A84C" />
-                </button>
-                <span style={{
-                  fontFamily: 'Jost, sans-serif',
-                  fontSize: '11px',
-                  color: '#8A7968',
-                  letterSpacing: '0.1em',
-                  textTransform: 'uppercase',
-                }}>
-                  {format(visibleWeek[0], 'd MMM', { locale: fr })} — {format(visibleWeek[6], 'd MMM yyyy', { locale: fr })}
-                </span>
-                <button
-                  onClick={() => setCalOffset(Math.min(3, calOffset + 1))}
-                  disabled={calOffset >= 3}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid rgba(201,168,76,0.25)',
-                    borderRadius: '50%',
-                    width: '32px', height: '32px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor: calOffset >= 3 ? 'not-allowed' : 'pointer',
-                    opacity: calOffset >= 3 ? 0.3 : 1,
-                  }}
-                >
-                  <ChevronRight size={15} color="#C9A84C" />
-                </button>
-              </div>
-
-              {/* Day headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', marginBottom: '8px' }}>
+              {/* Calendar grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
                 {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(d => (
                   <div key={d} style={{
                     textAlign: 'center',
@@ -385,230 +289,66 @@ export default function Admin() {
                     padding: '8px',
                   }}>{d}</div>
                 ))}
-              </div>
 
-              {/* 7-day row */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px', marginBottom: '32px' }}>
-                {visibleWeek.map((date) => {
-                  const dateStr = format(date, 'yyyy-MM-dd');
-                  const slots = getSlotsForDate(dateStr);
-                  const booked = getBookedSlotsForDate(dateStr);
-                  const isEditing = editingDate === dateStr;
-                  const hasSlots = slots.length > 0;
+                {/* Empty cells for alignment */}
+                {Array.from({ length: (new Date(next60Days[0]).getDay() + 6) % 7 }).map((_, i) => (
+                  <div key={`e${i}`} />
+                ))}
 
+                {next60Days.map((date) => {
+                  const avail = getAvailDoc(date);
                   return (
                     <motion.button
-                      key={dateStr}
-                      onClick={() => setEditingDate(isEditing ? null : dateStr)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.97 }}
+                      key={date.toISOString()}
+                      onClick={() => toggleDate(date)}
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.95 }}
                       style={{
                         aspectRatio: '1',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        background: isEditing
-                          ? 'linear-gradient(135deg, rgba(201,168,76,0.3), rgba(232,201,122,0.18))'
-                          : hasSlots
-                            ? 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(232,201,122,0.08))'
-                            : 'rgba(255,255,255,0.02)',
-                        border: isEditing
-                          ? '1px solid rgba(201,168,76,0.9)'
-                          : hasSlots
-                            ? '1px solid rgba(201,168,76,0.5)'
-                            : '1px solid rgba(255,255,255,0.05)',
-                        borderRadius: '6px',
+                        background: avail
+                          ? 'linear-gradient(135deg, rgba(201,168,76,0.25), rgba(232,201,122,0.15))'
+                          : 'rgba(255,255,255,0.02)',
+                        border: avail
+                          ? '1px solid rgba(201,168,76,0.6)'
+                          : '1px solid rgba(255,255,255,0.05)',
+                        borderRadius: '4px',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         gap: '2px',
-                        position: 'relative',
                       }}
                     >
                       <span style={{
                         fontFamily: 'Cormorant Garamond, serif',
-                        fontSize: '20px',
-                        color: hasSlots ? '#C9A84C' : '#FAF6EF',
+                        fontSize: '18px',
+                        color: avail ? '#C9A84C' : '#FAF6EF',
                         lineHeight: 1,
-                        opacity: hasSlots ? 1 : 0.4,
+                        opacity: avail ? 1 : 0.5,
                       }}>{format(date, 'd')}</span>
                       <span style={{
                         fontFamily: 'Jost, sans-serif',
                         fontSize: '8px',
-                        color: hasSlots ? '#E8C97A' : '#8A7968',
+                        color: avail ? '#E8C97A' : '#8A7968',
                         textTransform: 'uppercase',
                         letterSpacing: '0.05em',
                       }}>{format(date, 'MMM', { locale: fr })}</span>
-                      {hasSlots && (
-                        <span style={{
-                          fontFamily: 'Jost, sans-serif',
-                          fontSize: '8px',
-                          color: '#C9A84C',
-                          opacity: 0.8,
-                        }}>
-                          {slots.length - booked.filter(b => slots.includes(b)).length}/{slots.length}
-                        </span>
-                      )}
                     </motion.button>
                   );
                 })}
               </div>
 
-              {/* Slot editor panel */}
-              <AnimatePresence>
-                {editingDate && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    style={{
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '1px solid rgba(201,168,76,0.2)',
-                      borderRadius: '6px',
-                      padding: '24px 28px',
-                      marginBottom: '24px',
-                    }}
-                  >
-                    {/* Panel header */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: '20px',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Clock size={15} color="#C9A84C" />
-                        <span style={{
-                          fontFamily: 'Cormorant Garamond, serif',
-                          fontSize: '20px',
-                          color: '#FAF6EF',
-                        }}>
-                          {format(new Date(editingDate + 'T12:00:00'), 'EEEE d MMMM', { locale: fr })}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                        <button
-                          onClick={() => toggleAllSlots(editingDate)}
-                          style={{
-                            padding: '6px 14px',
-                            background: 'transparent',
-                            border: '1px solid rgba(201,168,76,0.3)',
-                            color: '#C9A84C',
-                            borderRadius: '2px',
-                            fontFamily: 'Jost, sans-serif',
-                            fontSize: '10px',
-                            letterSpacing: '0.1em',
-                            textTransform: 'uppercase',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {getSlotsForDate(editingDate).length === ALL_SLOTS.length ? 'Tout désactiver' : 'Tout activer'}
-                        </button>
-                        <button
-                          onClick={() => setEditingDate(null)}
-                          style={{
-                            background: 'transparent',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: '4px',
-                            display: 'flex',
-                            alignItems: 'center',
-                          }}
-                        >
-                          <X size={16} color="#8A7968" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Slot grid */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                      {ALL_SLOTS.map((slot) => {
-                        const isActive = getSlotsForDate(editingDate).includes(slot);
-                        const isBooked = getBookedSlotsForDate(editingDate).includes(slot);
-
-                        return (
-                          <motion.button
-                            key={slot}
-                            onClick={() => !isBooked && toggleSlot(editingDate, slot)}
-                            whileHover={!isBooked ? { scale: 1.08 } : {}}
-                            whileTap={!isBooked ? { scale: 0.95 } : {}}
-                            disabled={isBooked}
-                            style={{
-                              padding: '10px 18px',
-                              background: isBooked
-                                ? 'rgba(231,76,60,0.1)'
-                                : isActive
-                                  ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
-                                  : 'rgba(255,255,255,0.03)',
-                              border: isBooked
-                                ? '1px solid rgba(231,76,60,0.35)'
-                                : isActive
-                                  ? '1px solid #C9A84C'
-                                  : '1px solid rgba(255,255,255,0.08)',
-                              borderRadius: '4px',
-                              fontFamily: 'Jost, sans-serif',
-                              fontSize: '13px',
-                              color: isBooked
-                                ? '#E74C3C'
-                                : isActive
-                                  ? '#0A0A0A'
-                                  : '#8A7968',
-                              cursor: isBooked ? 'not-allowed' : 'pointer',
-                              transition: 'all 0.2s',
-                              fontWeight: isActive ? 600 : 400,
-                              position: 'relative',
-                              opacity: isBooked ? 0.7 : 1,
-                            }}
-                          >
-                            {slot}
-                            {isBooked && (
-                              <span style={{
-                                marginLeft: '6px',
-                                fontSize: '9px',
-                                letterSpacing: '0.05em',
-                                textTransform: 'uppercase',
-                                opacity: 0.8,
-                              }}>
-                                réservé
-                              </span>
-                            )}
-                          </motion.button>
-                        );
-                      })}
-                    </div>
-
-                    <p style={{
-                      fontFamily: 'Jost, sans-serif',
-                      fontSize: '11px',
-                      color: '#8A7968',
-                      marginTop: '16px',
-                      opacity: 0.7,
-                    }}>
-                      Les créneaux en rouge sont déjà réservés et ne peuvent pas être désactivés.
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Legend */}
-              <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
-                {[
-                  { color: 'rgba(201,168,76,0.15)', border: 'rgba(201,168,76,0.5)', label: 'Jour avec créneaux' },
-                  { color: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.05)', label: 'Jour fermé' },
-                  { color: 'linear-gradient(135deg, #C9A84C, #E8C97A)', border: '#C9A84C', label: 'Créneau ouvert' },
-                  { color: 'rgba(231,76,60,0.1)', border: 'rgba(231,76,60,0.35)', label: 'Créneau réservé' },
-                ].map(({ color, border, label }) => (
-                  <div key={label} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <div style={{
-                      width: '16px',
-                      height: '16px',
-                      background: color,
-                      border: `1px solid ${border}`,
-                      borderRadius: '3px',
-                    }} />
-                    <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>{label}</span>
-                  </div>
-                ))}
+              <div style={{ marginTop: '24px', display: 'flex', gap: '20px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ width: '16px', height: '16px', background: 'rgba(201,168,76,0.25)', border: '1px solid rgba(201,168,76,0.6)', borderRadius: '2px' }} />
+                  <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968' }}>Disponible</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{ width: '16px', height: '16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '2px' }} />
+                  <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968' }}>Non disponible</span>
+                </div>
               </div>
             </div>
           </motion.div>
