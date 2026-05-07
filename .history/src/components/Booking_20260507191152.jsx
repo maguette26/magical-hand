@@ -89,7 +89,7 @@ export default function Booking() {
     const service = SERVICES.find(s => s.id === selectedService);
     const dateStr = format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr });
     const message =
-`MAGICAL HAND BY MAMIFA
+`✨ *MAGICAL HAND BY MAMIFA
 _Studio de Maquillage Professionnel_
 ▸NOUVELLE RÉSERVATION
 ${name} ${phone ? `\n📲 ${phone}` : ''}

@@ -89,21 +89,28 @@ export default function Booking() {
     const service = SERVICES.find(s => s.id === selectedService);
     const dateStr = format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr });
     const message =
-`MAGICAL HAND BY MAMIFA
+`✨ *MAGICAL HAND BY MAMIFA* ✨
 _Studio de Maquillage Professionnel_
-▸NOUVELLE RÉSERVATION
-${name} ${phone ? `\n📲 ${phone}` : ''}
+
+▸ *NOUVELLE RÉSERVATION* ◂
+
+👤 *${name}*${phone ? `\n📲 ${phone}` : ''}
+
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-${service.label}
- ${service.price}
+💅 *${service.label}*
+💰 ${service.price}
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-🗓${dateStr}
-${selectedTime}
+🗓 *${dateStr}*
+⏰ *${selectedTime}*
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Paiement wave ou Orange  sur ce numéro: +221 77 669 57 90
+💳 *Paiement*
+Wave ou Orange Money
+➜ +221 77 669 57 90
+
 ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+
 _Votre RDV sera confirmé dès réception du paiement._
-_Merci de votre confiance `;
+_Merci de votre confiance 🌸_`;
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank');
   };
 

@@ -59,6 +59,7 @@ export default function Booking() {
   const [blockedSlots, setBlockedSlots] = useState([]);
   const [weekOffset, setWeekOffset] = useState(0);
 
+  // Génère 7 jours à partir de l'offset courant
   const visibleDays = Array.from({ length: 7 }, (_, i) =>
     addDays(new Date(), weekOffset * 7 + i + 1)
   );
@@ -89,21 +90,33 @@ export default function Booking() {
     const service = SERVICES.find(s => s.id === selectedService);
     const dateStr = format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr });
     const message =
-`MAGICAL HAND BY MAMIFA
-_Studio de Maquillage Professionnel_
-▸NOUVELLE RÉSERVATION
-${name} ${phone ? `\n📲 ${phone}` : ''}
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+`💄✨ *MAGICAL HAND BY MAMIFA* ✨💄
+
+────────────────────
+
+👤 Client : ${name}
+📱 Contact : ${phone || 'Non précisé'}
+
+────────────────────
+
+💅 Prestation
 ${service.label}
- ${service.price}
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-🗓${dateStr}
-${selectedTime}
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-Paiement wave ou Orange  sur ce numéro: +221 77 669 57 90
-┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
-_Votre RDV sera confirmé dès réception du paiement._
-_Merci de votre confiance `;
+💰 ${service.price}
+
+────────────────────
+
+📅 Date : ${dateStr}
+⏰ Heure : ${selectedTime}
+
+────────────────────
+
+💳 Paiement :
+Wave / Orange Money
+
+────────────────────
+
+💖 Merci pour votre confiance
+🌟 Réservation confirmée après paiement`;
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -115,8 +128,10 @@ _Merci de votre confiance `;
   };
 
   return (
-    <section id="reserver" className="booking-section">
-
+    <section
+  id="reserver"
+  className="booking-section"
+>
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 30 }}
@@ -135,7 +150,7 @@ _Merci de votre confiance `;
         }}>Réservation</p>
         <h2 style={{
           fontFamily: 'Cormorant Garamond, serif',
-          fontSize: 'clamp(36px, 5vw, 64px)',
+          fontSize: 'clamp(40px, 5vw, 64px)',
           fontWeight: 400,
           color: '#FAF6EF',
           marginBottom: '16px',
@@ -160,21 +175,20 @@ _Merci de votre confiance `;
       </motion.div>
 
       <div style={{ maxWidth: '700px', margin: '0 auto' }}>
-
         {/* Progress steps */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '40px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '50px' }}>
           {STEPS.map((s, i) => (
             <React.Fragment key={s.n}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
                 <div style={{
-                  width: '32px',
-                  height: '32px',
+                  width: '36px',
+                  height: '36px',
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontFamily: 'Cormorant Garamond, serif',
-                  fontSize: '15px',
+                  fontSize: '16px',
                   fontWeight: 600,
                   background: step >= s.n
                     ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
@@ -182,17 +196,15 @@ _Merci de votre confiance `;
                   color: step >= s.n ? '#0A0A0A' : '#8A7968',
                   border: step >= s.n ? 'none' : '1px solid rgba(201,168,76,0.3)',
                   transition: 'all 0.4s',
-                  flexShrink: 0,
                 }}>
-                  {step > s.n ? <Check size={13} strokeWidth={3} /> : s.n}
+                  {step > s.n ? <Check size={15} strokeWidth={3} /> : s.n}
                 </div>
                 <span style={{
                   fontFamily: 'Jost, sans-serif',
-                  fontSize: '9px',
-                  letterSpacing: '0.08em',
+                  fontSize: '10px',
+                  letterSpacing: '0.1em',
                   textTransform: 'uppercase',
                   color: step >= s.n ? '#C9A84C' : '#8A7968',
-                  whiteSpace: 'nowrap',
                 }}>
                   {s.label}
                 </span>
@@ -205,7 +217,7 @@ _Merci de votre confiance `;
                     ? 'linear-gradient(90deg, #C9A84C, rgba(201,168,76,0.4))'
                     : 'rgba(201,168,76,0.15)',
                   marginBottom: '24px',
-                  maxWidth: '60px',
+                  maxWidth: '80px',
                   transition: 'all 0.4s',
                 }} />
               )}
@@ -213,7 +225,7 @@ _Merci de votre confiance `;
           ))}
         </div>
 
-        {/* Step content card */}
+        {/* Step content */}
         <motion.div
           key={step}
           initial={{ opacity: 0, x: 20 }}
@@ -223,7 +235,7 @@ _Merci de votre confiance `;
             background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)',
             border: '1px solid rgba(201,168,76,0.15)',
             borderRadius: '4px',
-            padding: 'clamp(20px, 5vw, 44px)',
+            padding: '44px',
           }}
         >
 
@@ -232,12 +244,12 @@ _Merci de votre confiance `;
             <div>
               <h3 style={{
                 fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(22px, 4vw, 28px)',
+                fontSize: '28px',
                 color: '#FAF6EF',
-                marginBottom: '24px',
+                marginBottom: '28px',
               }}>Choisissez votre prestation</h3>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 {SERVICES.map((s) => {
                   const active = selectedService === s.id;
                   const { Icon } = s;
@@ -254,70 +266,68 @@ _Merci de votre confiance `;
                           ? '1px solid rgba(201,168,76,0.65)'
                           : '1px solid rgba(201,168,76,0.12)',
                         borderRadius: '6px',
-                        padding: '16px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
+                        padding: '20px 22px',
+                        display: 'grid',
+                        gridTemplateColumns: '48px 1fr auto',
+                        alignItems: 'center',
+                        gap: '16px',
                         cursor: 'pointer',
                         textAlign: 'left',
                         transition: 'all 0.3s',
-                        width: '100%',
                       }}
                     >
-                      {/* Top row: icon + label */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '40px',
-                          height: '40px',
-                          borderRadius: '50%',
-                          background: active
-                            ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
-                            : 'rgba(201,168,76,0.1)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                          transition: 'all 0.3s',
-                        }}>
-                          <Icon
-                            size={18}
-                            strokeWidth={1.5}
-                            color={active ? '#0A0A0A' : '#C9A84C'}
-                          />
-                        </div>
+                      {/* Icon bubble */}
+                      <div style={{
+                        width: '48px',
+                        height: '48px',
+                        borderRadius: '50%',
+                        background: active
+                          ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
+                          : 'rgba(201,168,76,0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                        transition: 'all 0.3s',
+                      }}>
+                        <Icon
+                          size={20}
+                          strokeWidth={1.5}
+                          color={active ? '#0A0A0A' : '#C9A84C'}
+                        />
+                      </div>
+
+                      {/* Label + description */}
+                      <div>
                         <div style={{
                           fontFamily: 'Jost, sans-serif',
-                          fontSize: '13px',
+                          fontSize: '14px',
                           fontWeight: 600,
                           color: active ? '#FAF6EF' : '#D4C9B8',
+                          marginBottom: '4px',
                           letterSpacing: '0.02em',
-                          flex: 1,
                         }}>
                           {s.label}
                         </div>
-                      </div>
-
-                      {/* Bottom row: description + price */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '10px', paddingLeft: '52px' }}>
                         <div style={{
                           fontFamily: 'Jost, sans-serif',
-                          fontSize: '11px',
+                          fontSize: '12px',
                           color: '#8A7968',
                           lineHeight: 1.4,
-                          flex: 1,
                         }}>
                           {s.description}
                         </div>
-                        <div style={{
-                          fontFamily: 'Cormorant Garamond, serif',
-                          fontSize: '15px',
-                          color: active ? '#E8C97A' : '#C9A84C',
-                          whiteSpace: 'nowrap',
-                          fontWeight: 500,
-                          flexShrink: 0,
-                        }}>
-                          {s.price}
-                        </div>
+                      </div>
+
+                      {/* Price */}
+                      <div style={{
+                        fontFamily: 'Cormorant Garamond, serif',
+                        fontSize: '17px',
+                        color: active ? '#E8C97A' : '#C9A84C',
+                        whiteSpace: 'nowrap',
+                        fontWeight: 500,
+                      }}>
+                        {s.price}
                       </div>
                     </motion.button>
                   );
@@ -331,7 +341,7 @@ _Merci de votre confiance `;
             <div>
               <h3 style={{
                 fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(22px, 4vw, 28px)',
+                fontSize: '28px',
                 color: '#FAF6EF',
                 marginBottom: '6px',
               }}>Choisissez votre date</h3>
@@ -339,19 +349,14 @@ _Merci de votre confiance `;
                 fontFamily: 'Jost, sans-serif',
                 fontSize: '12px',
                 color: '#8A7968',
-                marginBottom: '24px',
+                marginBottom: '28px',
                 letterSpacing: '0.05em',
               }}>
                 Seules les dates dorées sont disponibles
               </p>
 
-              {/* Week navigation row (above the grid) */}
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: '10px',
-              }}>
+              {/* Week navigation */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                 <button
                   onClick={() => setWeekOffset(Math.max(0, weekOffset - 1))}
                   disabled={weekOffset === 0}
@@ -359,8 +364,8 @@ _Merci de votre confiance `;
                     background: 'transparent',
                     border: '1px solid rgba(201,168,76,0.25)',
                     borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
+                    width: '34px',
+                    height: '34px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -370,18 +375,76 @@ _Merci de votre confiance `;
                     flexShrink: 0,
                   }}
                 >
-                  <ChevronLeft size={15} color="#C9A84C" />
+                  <ChevronLeft size={16} color="#C9A84C" />
                 </button>
 
-                <span style={{
-                  fontFamily: 'Jost, sans-serif',
-                  fontSize: '11px',
-                  color: '#8A7968',
-                  letterSpacing: '0.08em',
-                  textTransform: 'uppercase',
+                {/* 7-day grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(7, 1fr)',
+                  gap: '8px',
+                  flex: 1,
                 }}>
-                  {format(visibleDays[0], 'd MMM', { locale: fr })} — {format(visibleDays[6], 'd MMM yyyy', { locale: fr })}
-                </span>
+                  {visibleDays.map((date) => {
+                    const avail = isDateAvailable(date);
+                    const sel = selectedDate && isSameDay(date, selectedDate);
+                    return (
+                      <motion.button
+                        key={date.toISOString()}
+                        disabled={!avail}
+                        onClick={() => { setSelectedDate(date); setSelectedTime(null); }}
+                        whileHover={avail ? { scale: 1.06 } : {}}
+                        style={{
+                          padding: '10px 4px',
+                          background: sel
+                            ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
+                            : avail
+                              ? 'rgba(201,168,76,0.08)'
+                              : 'rgba(255,255,255,0.02)',
+                          border: sel
+                            ? '1px solid #C9A84C'
+                            : avail
+                              ? '1px solid rgba(201,168,76,0.4)'
+                              : '1px solid rgba(255,255,255,0.05)',
+                          borderRadius: '6px',
+                          cursor: avail ? 'pointer' : 'not-allowed',
+                          opacity: avail ? 1 : 0.3,
+                          transition: 'all 0.2s',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '3px',
+                        }}
+                      >
+                        <span style={{
+                          fontFamily: 'Jost, sans-serif',
+                          fontSize: '9px',
+                          letterSpacing: '0.08em',
+                          textTransform: 'uppercase',
+                          color: sel ? '#0A0A0A' : '#8A7968',
+                        }}>
+                          {format(date, 'EEE', { locale: fr })}
+                        </span>
+                        <span style={{
+                          fontFamily: 'Cormorant Garamond, serif',
+                          fontSize: '22px',
+                          color: sel ? '#0A0A0A' : avail ? '#C9A84C' : '#8A7968',
+                          lineHeight: 1,
+                        }}>
+                          {format(date, 'd')}
+                        </span>
+                        <span style={{
+                          fontFamily: 'Jost, sans-serif',
+                          fontSize: '9px',
+                          color: sel ? '#0A0A0A' : '#8A7968',
+                          textTransform: 'uppercase',
+                        }}>
+                          {format(date, 'MMM', { locale: fr })}
+                        </span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
 
                 <button
                   onClick={() => setWeekOffset(Math.min(3, weekOffset + 1))}
@@ -390,8 +453,8 @@ _Merci de votre confiance `;
                     background: 'transparent',
                     border: '1px solid rgba(201,168,76,0.25)',
                     borderRadius: '50%',
-                    width: '32px',
-                    height: '32px',
+                    width: '34px',
+                    height: '34px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -401,76 +464,8 @@ _Merci de votre confiance `;
                     flexShrink: 0,
                   }}
                 >
-                  <ChevronRight size={15} color="#C9A84C" />
+                  <ChevronRight size={16} color="#C9A84C" />
                 </button>
-              </div>
-
-              {/* 7-day grid — pleine largeur */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
-                gap: '5px',
-              }}>
-                {visibleDays.map((date) => {
-                  const avail = isDateAvailable(date);
-                  const sel = selectedDate && isSameDay(date, selectedDate);
-                  return (
-                    <motion.button
-                      key={date.toISOString()}
-                      disabled={!avail}
-                      onClick={() => { setSelectedDate(date); setSelectedTime(null); }}
-                      whileHover={avail ? { scale: 1.06 } : {}}
-                      style={{
-                        padding: '8px 2px',
-                        background: sel
-                          ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
-                          : avail
-                            ? 'rgba(201,168,76,0.08)'
-                            : 'rgba(255,255,255,0.02)',
-                        border: sel
-                          ? '1px solid #C9A84C'
-                          : avail
-                            ? '1px solid rgba(201,168,76,0.4)'
-                            : '1px solid rgba(255,255,255,0.05)',
-                        borderRadius: '6px',
-                        cursor: avail ? 'pointer' : 'not-allowed',
-                        opacity: avail ? 1 : 0.3,
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '2px',
-                        minWidth: 0,
-                      }}
-                    >
-                      <span style={{
-                        fontFamily: 'Jost, sans-serif',
-                        fontSize: '8px',
-                        letterSpacing: '0.05em',
-                        textTransform: 'uppercase',
-                        color: sel ? '#0A0A0A' : '#8A7968',
-                      }}>
-                        {format(date, 'EEE', { locale: fr })}
-                      </span>
-                      <span style={{
-                        fontFamily: 'Cormorant Garamond, serif',
-                        fontSize: 'clamp(16px, 3.5vw, 22px)',
-                        color: sel ? '#0A0A0A' : avail ? '#C9A84C' : '#8A7968',
-                        lineHeight: 1,
-                      }}>
-                        {format(date, 'd')}
-                      </span>
-                      <span style={{
-                        fontFamily: 'Jost, sans-serif',
-                        fontSize: '8px',
-                        color: sel ? '#0A0A0A' : '#8A7968',
-                        textTransform: 'uppercase',
-                      }}>
-                        {format(date, 'MMM', { locale: fr })}
-                      </span>
-                    </motion.button>
-                  );
-                })}
               </div>
 
               {/* Time slots */}
@@ -490,7 +485,7 @@ _Merci de votre confiance `;
                     <Clock size={13} color="#C9A84C" />
                     Créneaux disponibles
                   </p>
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                     {TIME_SLOTS.map((t) => {
                       const blocked = blockedSlots.includes(t);
                       const sel = selectedTime === t;
@@ -501,7 +496,7 @@ _Merci de votre confiance `;
                           onClick={() => setSelectedTime(t)}
                           whileHover={!blocked ? { scale: 1.06 } : {}}
                           style={{
-                            padding: '9px 14px',
+                            padding: '10px 20px',
                             background: sel
                               ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
                               : 'transparent',
@@ -535,14 +530,14 @@ _Merci de votre confiance `;
             <div>
               <h3 style={{
                 fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(22px, 4vw, 28px)',
+                fontSize: '28px',
                 color: '#FAF6EF',
                 marginBottom: '28px',
               }}>Vos informations</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {[
-                  { label: 'Votre prénom *', value: name, setter: setName, placeholder: 'Ex: Aïssatou', type: 'text' },
-                  { label: 'Votre téléphone (optionnel)', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel' },
+                  { label: 'Votre prénom *', value: name, setter: setName, placeholder: 'Ex: Aïssatou', type: 'text', required: true },
+                  { label: 'Votre téléphone (optionnel)', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel', required: false },
                 ].map((field) => (
                   <div key={field.label}>
                     <label style={{
@@ -588,9 +583,9 @@ _Merci de votre confiance `;
             <div>
               <h3 style={{
                 fontFamily: 'Cormorant Garamond, serif',
-                fontSize: 'clamp(22px, 4vw, 28px)',
+                fontSize: '28px',
                 color: '#FAF6EF',
-                marginBottom: '28px',
+                marginBottom: '32px',
               }}>Récapitulatif</h3>
 
               {[
@@ -604,8 +599,7 @@ _Merci de votre confiance `;
                 <div key={r.label} style={{
                   display: 'flex',
                   justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: '16px',
+                  alignItems: 'center',
                   padding: '14px 0',
                   borderBottom: '1px solid rgba(201,168,76,0.08)',
                 }}>
@@ -615,14 +609,13 @@ _Merci de votre confiance `;
                     letterSpacing: '0.15em',
                     textTransform: 'uppercase',
                     color: '#8A7968',
-                    flexShrink: 0,
-                    paddingTop: '3px',
                   }}>{r.label}</span>
                   <span style={{
                     fontFamily: 'Cormorant Garamond, serif',
-                    fontSize: '17px',
+                    fontSize: '18px',
                     color: '#FAF6EF',
                     textAlign: 'right',
+                    maxWidth: '60%',
                     textTransform: 'capitalize',
                   }}>{r.value}</span>
                 </div>
@@ -630,13 +623,13 @@ _Merci de votre confiance `;
 
               {/* Payment info */}
               <div style={{
-                marginTop: '24px',
-                padding: '16px',
+                marginTop: '28px',
+                padding: '20px',
                 background: 'rgba(201,168,76,0.06)',
                 border: '1px solid rgba(201,168,76,0.2)',
                 borderRadius: '4px',
                 display: 'flex',
-                gap: '12px',
+                gap: '14px',
                 alignItems: 'flex-start',
               }}>
                 <CreditCard size={18} color="#C9A84C" style={{ marginTop: '2px', flexShrink: 0 }} />
@@ -670,7 +663,7 @@ _Merci de votre confiance `;
                 whileTap={{ scale: 0.97 }}
                 style={{
                   width: '100%',
-                  marginTop: '24px',
+                  marginTop: '28px',
                   padding: '18px',
                   background: 'linear-gradient(135deg, #25D366, #128C7E)',
                   color: '#FFFFFF',
@@ -698,8 +691,8 @@ _Merci de votre confiance `;
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
-            marginTop: '32px',
-            paddingTop: '24px',
+            marginTop: '36px',
+            paddingTop: '28px',
             borderTop: '1px solid rgba(201,168,76,0.1)',
           }}>
             {step > 1 ? (
@@ -710,7 +703,7 @@ _Merci de votre confiance `;
                   background: 'transparent',
                   border: '1px solid rgba(201,168,76,0.25)',
                   color: '#8A7968',
-                  padding: '12px 20px',
+                  padding: '12px 24px',
                   borderRadius: '2px',
                   fontFamily: 'Jost, sans-serif',
                   fontSize: '11px',
@@ -738,7 +731,7 @@ _Merci de votre confiance `;
                     : 'rgba(255,255,255,0.05)',
                   color: canProceed() ? '#0A0A0A' : '#8A7968',
                   border: 'none',
-                  padding: '12px 32px',
+                  padding: '12px 36px',
                   borderRadius: '2px',
                   fontFamily: 'Jost, sans-serif',
                   fontSize: '11px',
@@ -762,13 +755,9 @@ _Merci de votre confiance `;
 
       <style>{`
         @media (max-width: 768px) {
-          #reserver { padding: 60px 16px !important; }
-        }
-        @media (max-width: 480px) {
-          #reserver { padding: 50px 12px !important; }
+          #reserver { padding: 80px 20px !important; }
         }
         input::placeholder { color: rgba(138,121,104,0.5); }
-        * { box-sizing: border-box; }
       `}</style>
     </section>
   );
