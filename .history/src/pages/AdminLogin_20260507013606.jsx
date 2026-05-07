@@ -108,7 +108,7 @@ export default function AdminLogin() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
-              placeholder="entrer votre email"
+              placeholder="mamifa@magicalhand.com"
               style={{
                 width: '100%',
                 padding: '14px 18px',

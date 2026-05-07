@@ -9,7 +9,7 @@ const DEFAULT_PHOTOS = [
   { id: '4', url: '/images/look4.jpg', title: 'Glam Sophistiqué', category: 'Glam' },
   { id: '8', url: '/images/look2.jpg', title: 'Glam Sophistiqué', category: 'Glam' },
   { id: '5', url: '/images/look5.jpg', title: 'Glam Evening', category: 'Glam' },
-  { id: '6', url: '/images/look6.jpg', title: 'Baptême', category: 'Cérémonie' },
+  { id: '6', url: '/images/look6.jpg', title: 'BaptêSoirée Radieuse', category: 'Cérémonie' },
   { id: '7', url: '/images/look7.jpg', category: 'Cérémonie' },
   { id: '9', url: '/images/simple2.jpeg', category: 'Naturel' },
   { id: '10', url: '/images/simple3.jpeg', category: 'Naturel' },

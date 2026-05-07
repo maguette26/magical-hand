@@ -12,7 +12,7 @@ import toast from 'react-hot-toast';
 import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-const CATEGORIES = ['Glam', 'Cérémonie', 'Naturel',];
+const CATEGORIES = ['Glam', 'Cérémonie', 'Mariage', 'Soirée', 'Naturel', 'Autre'];
 
 const TAB_STYLE = (active) => ({
   padding: '12px 24px',
