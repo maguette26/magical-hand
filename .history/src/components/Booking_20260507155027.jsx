@@ -102,9 +102,12 @@ export default function Booking() {
 
   return (
     <section
-  id="reserver"
-  className="booking-section"
->
+      id="reserver"
+      style={{
+        padding: '120px 60px',
+        background: 'linear-gradient(180deg, #0A0A0A 0%, #1A1714 100%)',
+      }}
+    >
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 30 }}

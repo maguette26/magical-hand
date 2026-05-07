@@ -41,16 +41,16 @@ export default function Gallery() {
       : photos.filter(p => p.category === activeCategory);
 
   return (
-    <section className="ig-section">
+    <section id="galerie" className="gallery-section">
 
       {/* HEADER */}
-      <div className="ig-header">
+      <div className="gallery-header">
         <h2>Mes Créations</h2>
-        <p>Swipe pour découvrir mes looks</p>
+        <p>Chaque transformation est unique. Découvrez mon travail.</p>
       </div>
 
       {/* FILTERS */}
-      <div className="ig-filters">
+      <div className="gallery-filters">
         {CATEGORIES.map(cat => (
           <button
             key={cat}
@@ -62,18 +62,20 @@ export default function Gallery() {
         ))}
       </div>
 
-      {/* DESKTOP GRID */}
-      <div className="ig-grid">
+      {/* GRID */}
+      <div className="gallery-grid">
         {filtered.map((photo, i) => (
           <motion.div
             key={photo.id}
-            className="ig-card"
-            onClick={() => setSelected(photo)}
+            className="gallery-item"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            onClick={() => setSelected(photo)}
           >
             <img src={photo.url} alt={photo.title} />
-            <div className="ig-overlay">
+
+            <div className="overlay">
               <h3>{photo.title}</h3>
               <span>{photo.category}</span>
             </div>
@@ -81,31 +83,17 @@ export default function Gallery() {
         ))}
       </div>
 
-      {/* MOBILE SWIPE */}
-      <div className="ig-swipe">
-        <div className="ig-track">
-          {filtered.map(photo => (
-            <div
-              key={photo.id}
-              className="ig-slide"
-              onClick={() => setSelected(photo)}
-            >
-              <img src={photo.url} alt={photo.title} />
-              <div className="ig-slide-text">
-                <h3>{photo.title}</h3>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* LIGHTBOX */}
       {selected && (
-        <div className="ig-lightbox" onClick={() => setSelected(null)}>
-          <div className="ig-lightbox-content">
+        <div className="lightbox" onClick={() => setSelected(null)}>
+          <div className="lightbox-content" onClick={(e) => e.stopPropagation()}>
             <img src={selected.url} alt={selected.title} />
             <h3>{selected.title}</h3>
             <p>{selected.category}</p>
+
+            <button className="close" onClick={() => setSelected(null)}>
+              ×
+            </button>
           </div>
         </div>
       )}

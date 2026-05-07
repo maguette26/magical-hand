@@ -101,10 +101,30 @@ export default function Booking() {
   };
 
   return (
-    <section
-  id="reserver"
-  className="booking-section"
->
+    <.booking-section {
+  padding: 120px 60px;
+  background: linear-gradient(180deg, #0A0A0A 0%, #1A1714 100%);
+  overflow-x: hidden;
+}
+
+/* TABLET */
+@media (max-width: 1024px) {
+  .booking-section {
+    padding: 100px 30px;
+  }
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .booking-section {
+    padding: 80px 16px;
+  }
+
+  /* container principal */
+  .booking-section > div {
+    max-width: 100% !important;
+  }
+}
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 30 }}

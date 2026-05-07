@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 1,
+            "activePatchIndex": 3,
             "patches": [
                 {
                     "date": 1778165016270,
@@ -12,6 +12,14 @@
                 {
                     "date": 1778165428181,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -3,14 +3,21 @@\n import { db } from '../firebase.js';\n import { collection, onSnapshot, query, where } from 'firebase/firestore';\n import { format, addDays, isSameDay } from 'date-fns';\n import { fr } from 'date-fns/locale';\n-import { Sparkles, Camera, Crown, Clock, ChevronLeft, ChevronRight, MessageCircle, CreditCard, Check } from 'lucide-react';\n+import { Sparkles, Camera, Crown, Clock, ChevronLeft, ChevronRight, MessageCircle, CreditCard, Check, Wand2 } from 'lucide-react';\n \n const WHATSAPP_NUMBER = '221776695790';\n \n const SERVICES = [\n   {\n+    id: 1,\n+    label: 'Maquillage Simple',\n+    price: '7 000 FCFA',\n+    description: 'Look naturel et soigné, idéal pour le quotidien',\n+    Icon: Wand2,\n+  },\n+  {\n     id: 2,\n     label: 'Maquillage Complet Glam',\n     price: '10 000 FCFA',\n     description: 'Look complet, longue tenue, éclat assuré',\n@@ -26,9 +33,9 @@\n   {\n     id: 4,\n     label: 'Cérémonie — Henné / Baptême / Mariage',\n     price: 'À partir de 25 000 FCFA',\n-    description: 'Retouches express incluses, look royal garanti',\n+    description: 'Look royal garanti · Retouche express disponible en supplément (+5 000 FCFA)',\n     Icon: Crown,\n   },\n ];\n \n"
+                },
+                {
+                    "date": 1778175359520,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -100,15 +100,32 @@\n     return false;\n   };\n \n   return (\n-    <section\n-      id=\"reserver\"\n-      style={{\n-        padding: '120px 60px',\n-        background: 'linear-gradient(180deg, #0A0A0A 0%, #1A1714 100%)',\n-      }}\n-    >\n+    <.booking-section {\n+  padding: 120px 60px;\n+  background: linear-gradient(180deg, #0A0A0A 0%, #1A1714 100%);\n+  overflow-x: hidden;\n+}\n+\n+/* TABLET */\n+@media (max-width: 1024px) {\n+  .booking-section {\n+    padding: 100px 30px;\n+  }\n+}\n+\n+/* MOBILE */\n+@media (max-width: 768px) {\n+  .booking-section {\n+    padding: 80px 16px;\n+  }\n+\n+  /* container principal */\n+  .booking-section > div {\n+    max-width: 100% !important;\n+  }\n+}\n       {/* Header */}\n       <motion.div\n         initial={{ opacity: 0, y: 30 }}\n         whileInView={{ opacity: 1, y: 0 }}\n"
+                },
+                {
+                    "date": 1778175374623,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -100,32 +100,12 @@\n     return false;\n   };\n \n   return (\n-    <.booking-section {\n-  padding: 120px 60px;\n-  background: linear-gradient(180deg, #0A0A0A 0%, #1A1714 100%);\n-  overflow-x: hidden;\n-}\n-\n-/* TABLET */\n-@media (max-width: 1024px) {\n-  .booking-section {\n-    padding: 100px 30px;\n-  }\n-}\n-\n-/* MOBILE */\n-@media (max-width: 768px) {\n-  .booking-section {\n-    padding: 80px 16px;\n-  }\n-\n-  /* container principal */\n-  .booking-section > div {\n-    max-width: 100% !important;\n-  }\n-}\n+    <section\n+  id=\"reserver\"\n+  className=\"booking-section\"\n+>\n       {/* Header */}\n       <motion.div\n         initial={{ opacity: 0, y: 30 }}\n         whileInView={{ opacity: 1, y: 0 }}\n"
                 }
             ],
             "date": 1778165016270,
