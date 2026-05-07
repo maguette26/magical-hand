@@ -89,34 +89,7 @@ export default function Booking() {
   const handleWhatsApp = () => {
     const service = SERVICES.find(s => s.id === selectedService);
     const dateStr = format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr });
-    const message =
-`💄✨ *MAGICAL HAND BY MAMIFA* ✨💄
-
-────────────────────
-
-👤 Client : ${name}
-📱 Contact : ${phone || 'Non précisé'}
-
-────────────────────
-
-💅 Prestation
-${service.label}
-💰 ${service.price}
-
-────────────────────
-
-📅 Date : ${dateStr}
-⏰ Heure : ${selectedTime}
-
-────────────────────
-
-💳 Paiement :
-Wave / Orange Money
-
-────────────────────
-
-💖 Merci pour votre confiance
-🌟 Réservation confirmée après paiement`;
+    const message = `Bonjour Mamifa !\n\nJe souhaite réserver un rendez-vous chez Magical Hand by Mamifa :\n\ *Prestation :* ${service.label} (${service.price})\n📅 *Date :* ${dateStr}\n🕐 *Heure :* ${selectedTime}\n👤 *Nom :* ${name}\n📱 *Téléphone :* ${phone || 'Non précisé'}\n\nJe vous contacterai pour confirmer le paiement via Wave ou Orange Money.\nMerci ! 🙏`;
     window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
