@@ -1,0 +1,18 @@
+{
+    "sourceFile": "public/images/simple.jpg",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 0,
+            "patches": [
+                {
+                    "date": 1778117165299,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                }
+            ],
+            "date": 1778117165299,
+            "name": "Commit-0",
+            "content": "c:\\Users\\Administrateur\\AppData\\Local\\Packages\\5319275A.WhatsAppDesktop_cv1g1gvanyjgm\\LocalState\\sessions\\4E5EB519D28343ABB8A93A0A59E9BE97D32401F9\\transfers\\2026-19\\WhatsApp Image 2026-05-07 at 02.19.22.jpeg"
+        }
+    ]
+}

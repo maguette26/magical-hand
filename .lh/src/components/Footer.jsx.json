@@ -1,0 +1,22 @@
+{
+    "sourceFile": "src/components/Footer.jsx",
+    "activeCommit": 0,
+    "commits": [
+        {
+            "activePatchIndex": 1,
+            "patches": [
+                {
+                    "date": 1778118701677,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1778118737869,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -41,9 +41,9 @@\n           color: \"#FAF6EF\",\n           marginBottom: \"10px\",\n         }}\n       >\n-        📞 +221 77 669 57 90\n+        📞T +221 77 669 57 90\n       </p>\n \n       {/* Paiement */}\n       <p\n"
+                }
+            ],
+            "date": 1778118701677,
+            "name": "Commit-0",
+            "content": "import React from \"react\";\n\nexport default function Footer() {\n  return (\n    <footer\n      style={{\n        background: \"#0A0A0A\",\n        borderTop: \"1px solid rgba(201,168,76,0.2)\",\n        padding: \"40px 20px\",\n        textAlign: \"center\",\n      }}\n    >\n      {/* Nom */}\n      <h2\n        style={{\n          fontFamily: \"Cormorant Garamond, serif\",\n          fontSize: \"28px\",\n          color: \"#C9A84C\",\n          marginBottom: \"6px\",\n        }}\n      >\n        Magical Hand\n      </h2>\n\n      <p\n        style={{\n          fontSize: \"12px\",\n          color: \"#8A7968\",\n          letterSpacing: \"0.2em\",\n          marginBottom: \"20px\",\n          textTransform: \"uppercase\",\n        }}\n      >\n        by Mamifa\n      </p>\n\n      {/* Téléphone */}\n      <p\n        style={{\n          fontSize: \"14px\",\n          color: \"#FAF6EF\",\n          marginBottom: \"10px\",\n        }}\n      >\n        📞 +221 77 669 57 90\n      </p>\n\n      {/* Paiement */}\n      <p\n        style={{\n          fontSize: \"13px\",\n          color: \"#8A7968\",\n          marginBottom: \"6px\",\n        }}\n      >\n        Paiement via\n      </p>\n\n      <p\n        style={{\n          fontSize: \"14px\",\n          color: \"#C9A84C\",\n          fontWeight: \"500\",\n          marginBottom: \"20px\",\n        }}\n      >\n        Wave · Orange Money\n      </p>\n\n      {/* petit texte */}\n      <p\n        style={{\n          fontSize: \"11px\",\n          color: \"#5A4E45\",\n          letterSpacing: \"0.1em\",\n        }}\n      >\n        Réservation via WhatsApp uniquement\n      </p>\n    </footer>\n  );\n}"
+        }
+    ]
+}
