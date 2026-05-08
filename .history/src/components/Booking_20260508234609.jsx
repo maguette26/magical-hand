@@ -25,6 +25,7 @@ const SERVICES = [
   { id: 4, label: 'Cérémonie — Henné / Baptême / Mariage', price: 'À partir de 25 000 FCFA', montantTotal: 25000, description: 'Look royal garanti · Retouche express disponible en supplément (+5 000 FCFA)', Icon: Crown },
 ];
 
+// ─── Payment status labels ────────────────────────────────────────────────────
 export const PAYMENT_STATUS_LABEL = {
   en_attente_paiement: 'En attente de paiement',
   acompte_paye:        'Acompte payé',
@@ -228,24 +229,9 @@ export default function Booking() {
 
   const service = SERVICES.find(s => s.id === selectedService);
   const montantTotal = service?.montantTotal || 0;
-
-  // ── Calcul du montant d'acompte avec personnalisation ──────────────────────
-  const getAcompteAmount = () => {
-    if (paymentType === 'total') return montantTotal;
-    const parsed = parseInt(customAmount);
-    if (!isNaN(parsed) && parsed >= ACOMPTE_MIN && parsed <= montantTotal) return parsed;
-    return ACOMPTE_MIN;
-  };
-
-  const montantPaye = getAcompteAmount();
+  const montantPaye = paymentType === 'total' ? montantTotal : ACOMPTE_MIN;
   const resteAPayer = montantTotal - montantPaye;
   const statutPaiement = paymentType === 'total' ? 'paye_entierement' : 'acompte_paye';
-
-  // Raccourcis acompte selon le montant total
-  const getAcompteShortcuts = () => {
-    const shortcuts = [2000, 3000, 4000, 5000, 7000, 10000];
-    return shortcuts.filter(v => v >= ACOMPTE_MIN && v < montantTotal);
-  };
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'availability'), (snap) => {
@@ -293,7 +279,7 @@ export default function Booking() {
     setProofPreview(URL.createObjectURL(file));
   };
 
-  // ── Create booking ──────────────────────────────────────────────────────────
+  // ── Create booking with new payment fields ──────────────────────────────────
   const handleCreateBooking = async () => {
     if (creatingBooking) return;
     setCreatingBooking(true);
@@ -301,7 +287,6 @@ export default function Booking() {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const now = new Date();
       const expirationAcompteAt = new Date(now.getTime() + PAYMENT_EXPIRY_HOURS * 3600 * 1000);
-      const acompteChoisi = montantPaye;
 
       const docRef = await addDoc(collection(db, 'bookings'), {
         // Client
@@ -317,14 +302,12 @@ export default function Booking() {
         dateRendezVous: `${dateStr}T${selectedTime}:00`,
         // Payment
         montantTotal,
-        montantAcompteChoisi: acompteChoisi,
         montantPaye: 0,
         resteAPayer: montantTotal,
         statutPaiement: 'en_attente_paiement',
-        typeReglement: paymentType,
         // Booking status
         statutReservation: 'en_attente_paiement',
-        status: 'en_attente_paiement',
+        status: 'en_attente_paiement', // keep for admin compat
         // Expiry
         expirationAcompteAt,
         dateReservation: serverTimestamp(),
@@ -339,8 +322,7 @@ export default function Booking() {
         name: name.trim(), phone: phone.trim(),
         service: service.label, servicePrice: service.price,
         date: dateStr, time: selectedTime,
-        montantTotal, montantAcompteChoisi: acompteChoisi,
-        expirationAcompteAt,
+        montantTotal, expirationAcompteAt,
       });
 
       // Auto-notify client via WhatsApp
@@ -354,7 +336,7 @@ Votre créneau est réservé temporairement.
 💋 Prestation : ${service.label}
 📅 Date : ${dateStr} à ${selectedTime}
 ━━━━━━━━━━━━━━━━━━━
-Vous avez *24h* pour payer un acompte de *${acompteChoisi.toLocaleString()} FCFA* afin de confirmer votre rendez-vous.
+Vous avez *24h* pour payer un acompte de *${ACOMPTE_MIN.toLocaleString()} FCFA* afin de confirmer votre rendez-vous.
 
 Sans paiement dans ce délai, le créneau sera automatiquement libéré.
 
@@ -378,9 +360,10 @@ _Magical Hand by Mamifa_ ✨`;
     setUploading(true);
     try {
       const url = await uploadImage(proofFile);
+      const now = new Date();
       const isPaidFull = paymentType === 'total';
       const newStatut = isPaidFull ? 'paye_entierement' : 'acompte_paye';
-      const montant = montantPaye; // utilise le montant personnalisé
+      const montant = isPaidFull ? montantTotal : ACOMPTE_MIN;
       const reste = montantTotal - montant;
 
       await updateDoc(doc(db, 'bookings', bookingId), {
@@ -410,13 +393,13 @@ _Magical Hand by Mamifa_ ✨`;
       // WA message to admin
       const adminMsg = isPaidFull
         ? `✔️ *MAGICAL HAND — Paiement complet*\n━━━━━━━━━━━━━━━━━━━\n👤 ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Total payé : ${montantTotal.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`
-        : `✔️ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Acompte payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
+        : `✔️ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Acompte payé : ${ACOMPTE_MIN.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
       window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(adminMsg)}`, '_blank');
 
       // WA message to client
       const clientMsg = isPaidFull
         ? `✔️ *Paiement complet reçu*\nMerci *${name}*, votre rendez-vous est entièrement réglé.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`
-        : `✔️ *Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`;
+        : `✔️ *Réservation confirmée*\nAcompte payé : *${ACOMPTE_MIN.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`;
       window.open(`https://wa.me/${phone.replace(/\s/g,'')}?text=${encodeURIComponent(clientMsg)}`, '_blank');
 
       setPaymentSent(true);
@@ -662,116 +645,27 @@ Merci de traiter la demande dans le dashboard.`;
                   <CreditCard size={14} color="#C9A84C" /> Choisissez le montant à payer maintenant
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-                  {/* Acompte */}
+                  {/* Acompte minimum */}
                   <motion.button
                     onClick={() => setPaymentType('acompte')}
                     whileHover={{ x: 3 }}
-                    style={{ padding: '16px 20px', background: paymentType === 'acompte' ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.02)', border: paymentType === 'acompte' ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(201,168,76,0.15)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
+                    style={{ padding: '16px 20px', background: paymentType === 'acompte' ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.02)', border: paymentType === 'acompte' ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(201,168,76,0.15)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                   >
                     <div>
                       <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#FAF6EF', fontWeight: 600, marginBottom: '4px' }}>
-                        Acompte
+                        Acompte minimum
                         {paymentType === 'acompte' && <span style={{ marginLeft: '8px', fontSize: '10px', color: '#25D366' }}>✓ Sélectionné</span>}
                       </div>
-                      <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>
-                        Minimum {ACOMPTE_MIN.toLocaleString()} FCFA — reste à payer le jour J
-                      </div>
+                      <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>Reste {(montantTotal - ACOMPTE_MIN).toLocaleString()} FCFA à payer le jour J</div>
                     </div>
-                    <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#C9A84C', fontWeight: 500, flexShrink: 0, marginLeft: '12px' }}>
-                      {montantPaye.toLocaleString()} F
-                    </div>
+                    <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#C9A84C', fontWeight: 500 }}>{ACOMPTE_MIN.toLocaleString()} F</div>
                   </motion.button>
-
-                  {/* Champ montant personnalisé — visible si acompte sélectionné */}
-                  <AnimatePresence>
-                    {paymentType === 'acompte' && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -8, height: 0 }}
-                        animate={{ opacity: 1, y: 0, height: 'auto' }}
-                        exit={{ opacity: 0, y: -8, height: 0 }}
-                        style={{ overflow: 'hidden' }}
-                      >
-                        <div style={{ padding: '16px 18px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.18)', borderRadius: '6px' }}>
-                          <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', letterSpacing: '0.15em', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
-                            Montant de l'acompte (min. {ACOMPTE_MIN.toLocaleString()} FCFA)
-                          </label>
-
-                          {/* Raccourcis rapides */}
-                          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                            {getAcompteShortcuts().map(v => (
-                              <button
-                                key={v}
-                                onClick={() => setCustomAmount(String(v))}
-                                style={{
-                                  padding: '6px 14px',
-                                  background: (customAmount === String(v) || (!customAmount && v === ACOMPTE_MIN))
-                                    ? 'rgba(201,168,76,0.2)'
-                                    : 'rgba(255,255,255,0.03)',
-                                  border: (customAmount === String(v) || (!customAmount && v === ACOMPTE_MIN))
-                                    ? '1px solid rgba(201,168,76,0.6)'
-                                    : '1px solid rgba(201,168,76,0.2)',
-                                  borderRadius: '4px',
-                                  fontFamily: 'Jost, sans-serif',
-                                  fontSize: '12px',
-                                  color: '#C9A84C',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s',
-                                }}
-                              >
-                                {v.toLocaleString()} F
-                              </button>
-                            ))}
-                          </div>
-
-                          {/* Saisie libre */}
-                          <div style={{ position: 'relative' }}>
-                            <input
-                              type="number"
-                              min={ACOMPTE_MIN}
-                              max={montantTotal - 1}
-                              step={500}
-                              value={customAmount}
-                              onChange={e => setCustomAmount(e.target.value)}
-                              placeholder={`${ACOMPTE_MIN.toLocaleString()} (minimum)`}
-                              style={{
-                                ...inputStyle,
-                                paddingRight: '60px',
-                                fontSize: '14px',
-                              }}
-                              onFocus={e => e.target.style.borderColor = '#C9A84C'}
-                              onBlur={e => {
-                                e.target.style.borderColor = 'rgba(201,168,76,0.25)';
-                                const val = parseInt(customAmount);
-                                if (customAmount && (isNaN(val) || val < ACOMPTE_MIN)) {
-                                  setCustomAmount(String(ACOMPTE_MIN));
-                                } else if (!isNaN(val) && val >= montantTotal) {
-                                  setCustomAmount(String(montantTotal - 500 > ACOMPTE_MIN ? montantTotal - 500 : ACOMPTE_MIN));
-                                }
-                              }}
-                            />
-                            <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', pointerEvents: 'none' }}>
-                              FCFA
-                            </span>
-                          </div>
-
-                          {/* Indication reste */}
-                          {resteAPayer > 0 && (
-                            <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', margin: '10px 0 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ color: '#E8A44C' }}>→</span>
-                              Reste à payer le jour J : <strong style={{ color: '#FAF6EF' }}>{resteAPayer.toLocaleString()} FCFA</strong>
-                            </p>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
 
                   {/* Paiement total */}
                   <motion.button
                     onClick={() => setPaymentType('total')}
                     whileHover={{ x: 3 }}
-                    style={{ padding: '16px 20px', background: paymentType === 'total' ? 'rgba(37,211,102,0.08)' : 'rgba(255,255,255,0.02)', border: paymentType === 'total' ? '1px solid rgba(37,211,102,0.4)' : '1px solid rgba(201,168,76,0.15)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
+                    style={{ padding: '16px 20px', background: paymentType === 'total' ? 'rgba(37,211,102,0.08)' : 'rgba(255,255,255,0.02)', border: paymentType === 'total' ? '1px solid rgba(37,211,102,0.4)' : '1px solid rgba(201,168,76,0.15)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                   >
                     <div>
                       <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#FAF6EF', fontWeight: 600, marginBottom: '4px' }}>
@@ -780,14 +674,14 @@ Merci de traiter la demande dans le dashboard.`;
                       </div>
                       <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>Rien à payer le jour J — tout est réglé</div>
                     </div>
-                    <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#25D366', fontWeight: 500, flexShrink: 0, marginLeft: '12px' }}>{montantTotal.toLocaleString()} F</div>
+                    <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#25D366', fontWeight: 500 }}>{montantTotal.toLocaleString()} F</div>
                   </motion.button>
                 </div>
               </div>
 
               {/* Summary box */}
               <div style={{ padding: '16px 20px', background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px', marginBottom: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: resteAPayer > 0 ? '8px' : 0 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.1em', textTransform: 'uppercase' }}>À payer maintenant</span>
                   <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '20px', color: '#C9A84C' }}>{montantPaye.toLocaleString()} FCFA</span>
                 </div>
@@ -895,7 +789,7 @@ Merci de traiter la demande dans le dashboard.`;
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '14px', color: '#8A7968', maxWidth: '360px', margin: '0 auto 24px', lineHeight: 1.7 }}>
                     {paymentType === 'total'
                       ? `Merci ${name}, votre rendez-vous est entièrement réglé. Mamifa vous confirmera votre créneau après vérification.`
-                      : `Acompte payé : ${montantPaye.toLocaleString()} FCFA. Reste à payer : ${resteAPayer.toLocaleString()} FCFA le jour du rendez-vous.`}
+                      : `Acompte payé : ${ACOMPTE_MIN.toLocaleString()} FCFA. Reste à payer : ${resteAPayer.toLocaleString()} FCFA le jour du rendez-vous.`}
                   </p>
                   <div style={{ padding: '16px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: '4px', marginBottom: '20px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#25D366', margin: 0 }}>
@@ -981,8 +875,8 @@ Merci de traiter la demande dans le dashboard.`;
                       { l: 'Prestation', v: foundBooking.service },
                       { l: 'Date', v: `${foundBooking.date} à ${foundBooking.time}` },
                       { l: 'Statut', v: BOOKING_STATUS_LABEL[foundBooking.statutReservation || foundBooking.status] || foundBooking.statutReservation || foundBooking.status },
-                      (foundBooking.montantPaye > 0) ? { l: 'Payé', v: `${(foundBooking.montantPaye || 0).toLocaleString()} FCFA` } : null,
-                      (foundBooking.resteAPayer > 0) ? { l: 'Reste à payer', v: `${(foundBooking.resteAPayer || 0).toLocaleString()} FCFA` } : null,
+                      foundBooking.montantPaye > 0 ? { l: 'Payé', v: `${(foundBooking.montantPaye || 0).toLocaleString()} FCFA` } : null,
+                      foundBooking.resteAPayer > 0 ? { l: 'Reste à payer', v: `${(foundBooking.resteAPayer || 0).toLocaleString()} FCFA` } : null,
                     ].filter(Boolean).map(({ l, v }) => (
                       <div key={l} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '6px 0', borderBottom: '1px solid rgba(201,168,76,0.06)' }}>
                         <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{l}</span>
@@ -1043,8 +937,6 @@ Merci de traiter la demande dans le dashboard.`;
         @media (max-width: 768px) { #reserver { padding: 60px 16px !important; } }
         @media (max-width: 480px) { #reserver { padding: 50px 12px !important; } }
         input::placeholder { color: rgba(138,121,104,0.5); }
-        input[type=number]::-webkit-inner-spin-button,
-        input[type=number]::-webkit-outer-spin-button { opacity: 0.4; }
         * { box-sizing: border-box; }
       `}</style>
     </section>

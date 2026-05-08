@@ -20,15 +20,20 @@ import {
   ChevronLeft, ChevronRight, Clock, X, Check, AlertTriangle, Eye,
   RefreshCw, Ban, RotateCcw, Search, Archive, Trash2, Bell, Edit3,
   History, SortAsc, SortDesc, Filter, CheckCircle, Calendar, Phone,
-  User, Download, MessageSquare, Wallet
+  User, Download, MessageSquare
 } from 'lucide-react';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const CATEGORIES = ['Glam', 'Cérémonie', 'Naturel'];
 const ALL_SLOTS = ['08:00','09:00','10:00','11:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
 
-const PAYMENT_EXPIRY_MINUTES = 1440; // 24 heures
+// Delay in minutes before pending_payment expires (default: 24h = 1440 min, set lower for testing)
+const PAYMENT_EXPIRY_MINUTES = 1440; // 24 hours
+
+// Auto-delete archived bookings older than N days
 const AUTO_DELETE_AFTER_DAYS = 60;
+
+// Reminder hours before appointment
 const REMINDER_HOURS_BEFORE = 24;
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
@@ -56,12 +61,6 @@ export const STATUS_COLOR = {
   expired:                '#444',
   completed:              '#4A90D9',
   archived:               '#3A3A3A',
-  // Statuts Booking.jsx (compatibilité)
-  en_attente_paiement:    '#C9A84C',
-  acompte_paye:           '#E8A44C',
-  paye_entierement:       '#25D366',
-  expire:                 '#444',
-  annule:                 '#555',
 };
 
 export const STATUS_LABEL = {
@@ -73,13 +72,6 @@ export const STATUS_LABEL = {
   expired:                'Expiré',
   completed:              'Terminé',
   archived:               'Archivé',
-  // Statuts Booking.jsx (compatibilité)
-  en_attente_paiement:    'En attente paiement',
-  acompte_paye:           'Acompte payé',
-  paye_entierement:       'Payé entièrement',
-  expire:                 'Expiré',
-  annule:                 'Annulé',
-  cancellation_requested: 'Annulation demandée',
 };
 
 const labelStyle = {
@@ -144,27 +136,6 @@ function notifyWA(booking, type, extra = {}) {
   if (url) window.open(url, '_blank');
 }
 
-// ─── Utilitaire : lecture montant payé (compatibilité double système) ─────────
-function getMontantPaye(b) {
-  // Priorité au champ montantPaye, sinon acompte (ancien champ)
-  if (b.montantPaye !== undefined && b.montantPaye !== null) return Number(b.montantPaye);
-  if (b.acompte !== undefined && b.acompte !== null) return Number(b.acompte);
-  return 0;
-}
-
-function getMontantTotal(b) {
-  if (b.montantTotal !== undefined && b.montantTotal !== null) return Number(b.montantTotal);
-  return 0;
-}
-
-function getResteAPayer(b) {
-  if (b.resteAPayer !== undefined && b.resteAPayer !== null) return Number(b.resteAPayer);
-  const total = getMontantTotal(b);
-  const paye = getMontantPaye(b);
-  if (total > 0) return Math.max(0, total - paye);
-  return 0;
-}
-
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const color = STATUS_COLOR[status] || '#8A7968';
@@ -188,55 +159,6 @@ function StatusBadge({ status }) {
       <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: color, flexShrink: 0 }} />
       {label}
     </span>
-  );
-}
-
-// ─── PaymentBadge — affiche montant payé / reste ──────────────────────────────
-function PaymentBadge({ booking }) {
-  const paye = getMontantPaye(booking);
-  const total = getMontantTotal(booking);
-  const reste = getResteAPayer(booking);
-
-  if (!total && !paye) return null;
-
-  const isPaidFull = reste === 0 && paye > 0;
-  const isPending = paye === 0;
-
-  return (
-    <div style={{
-      display: 'inline-flex',
-      flexDirection: 'column',
-      gap: '3px',
-      padding: '6px 10px',
-      background: isPaidFull
-        ? 'rgba(37,211,102,0.06)'
-        : isPending
-          ? 'rgba(201,168,76,0.05)'
-          : 'rgba(232,164,76,0.06)',
-      border: `1px solid ${isPaidFull ? 'rgba(37,211,102,0.2)' : isPending ? 'rgba(201,168,76,0.15)' : 'rgba(232,164,76,0.2)'}`,
-      borderRadius: '4px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-        <Wallet size={10} color={isPaidFull ? '#25D366' : isPending ? '#C9A84C' : '#E8A44C'} />
-        <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: isPaidFull ? '#25D366' : isPending ? '#C9A84C' : '#E8A44C', letterSpacing: '0.05em' }}>
-          {isPending
-            ? `En attente · Total : ${total.toLocaleString()} F`
-            : isPaidFull
-              ? `Payé : ${paye.toLocaleString()} FCFA`
-              : `Payé : ${paye.toLocaleString()} F`}
-        </span>
-      </div>
-      {!isPaidFull && !isPending && reste > 0 && (
-        <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', paddingLeft: '15px' }}>
-          Reste : <strong style={{ color: '#FAF6EF' }}>{reste.toLocaleString()} F</strong> le jour J
-        </span>
-      )}
-      {total > 0 && !isPending && (
-        <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '9px', color: '#555', paddingLeft: '15px' }}>
-          Total : {total.toLocaleString()} FCFA
-        </span>
-      )}
-    </div>
   );
 }
 
@@ -299,18 +221,13 @@ function EditBookingModal({ booking, bookings, availability, onClose, onSave }) 
     service: booking.service || '',
     date: booking.date || '',
     time: booking.time || '',
-    montantPaye: getMontantPaye(booking) || '',
-    montantTotal: getMontantTotal(booking) || '',
-    status: booking.status || booking.statutReservation || 'pending_payment',
+    acompte: booking.acompte || '',
+    status: booking.status || 'pending_payment',
   });
 
   const getSlotsForDate = (d) => availability[d]?.slots || [];
   const getBookedSlotsForDate = (d) =>
-    bookings.filter(b => b.date === d && b.id !== booking.id && !['cancelled','expired','archived','completed','annule','expire'].includes(b.status || b.statutReservation)).map(b => b.time);
-
-  const resteCalcule = form.montantTotal && form.montantPaye
-    ? Math.max(0, Number(form.montantTotal) - Number(form.montantPaye))
-    : getResteAPayer(booking);
+    bookings.filter(b => b.date === d && b.id !== booking.id && !['cancelled','expired','archived','completed'].includes(b.status)).map(b => b.time);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -332,6 +249,7 @@ function EditBookingModal({ booking, bookings, availability, onClose, onSave }) 
             { label: 'Nom', key: 'name', type: 'text', icon: <User size={12} /> },
             { label: 'Téléphone', key: 'phone', type: 'tel', icon: <Phone size={12} /> },
             { label: 'Prestation', key: 'service', type: 'text' },
+            { label: 'Acompte (FCFA)', key: 'acompte', type: 'number' },
           ].map(({ label, key, type, icon }) => (
             <div key={key}>
               <label style={labelStyle}>{label}</label>
@@ -345,41 +263,6 @@ function EditBookingModal({ booking, bookings, availability, onClose, onSave }) 
               </div>
             </div>
           ))}
-
-          {/* Paiement */}
-          <div style={{ padding: '16px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '6px' }}>
-            <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Wallet size={11} /> Paiement
-            </p>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div>
-                <label style={{ ...labelStyle, fontSize: '10px' }}>Montant total (FCFA)</label>
-                <input type="number" value={form.montantTotal}
-                  onChange={e => setForm(f => ({ ...f, montantTotal: e.target.value }))}
-                  style={{ ...inputStyle, fontSize: '13px', padding: '10px 12px' }}
-                  onFocus={e => e.target.style.borderColor = '#C9A84C'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(201,168,76,0.25)'} />
-              </div>
-              <div>
-                <label style={{ ...labelStyle, fontSize: '10px' }}>Montant payé (FCFA)</label>
-                <input type="number" value={form.montantPaye}
-                  onChange={e => setForm(f => ({ ...f, montantPaye: e.target.value }))}
-                  style={{ ...inputStyle, fontSize: '13px', padding: '10px 12px' }}
-                  onFocus={e => e.target.style.borderColor = '#C9A84C'}
-                  onBlur={e => e.target.style.borderColor = 'rgba(201,168,76,0.25)'} />
-              </div>
-            </div>
-            {resteCalcule > 0 && (
-              <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#E8A44C', margin: '8px 0 0' }}>
-                Reste à payer : <strong>{resteCalcule.toLocaleString()} FCFA</strong>
-              </p>
-            )}
-            {resteCalcule === 0 && Number(form.montantPaye) > 0 && (
-              <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#25D366', margin: '8px 0 0' }}>
-                ✓ Entièrement réglé
-              </p>
-            )}
-          </div>
 
           <div>
             <label style={labelStyle}>Date</label>
@@ -412,7 +295,7 @@ function EditBookingModal({ booking, bookings, availability, onClose, onSave }) 
             <label style={labelStyle}>Statut</label>
             <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
               style={{ ...inputStyle, cursor: 'pointer' }}>
-              {Object.entries(STATUS_LABEL).filter(([k]) => !['en_attente_paiement','acompte_paye','paye_entierement','expire','annule'].includes(k)).map(([k, v]) => (
+              {Object.entries(STATUS_LABEL).map(([k, v]) => (
                 <option key={k} value={k} style={{ background: '#1A1714' }}>{v}</option>
               ))}
             </select>
@@ -459,7 +342,7 @@ export default function Admin() {
   // Booking filters
   const [statusFilter, setStatusFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortOrder, setSortOrder] = useState('desc'); // desc = recent first
   const [showArchived, setShowArchived] = useState(false);
 
   const [editingPhoto, setEditingPhoto] = useState(null);
@@ -493,32 +376,30 @@ export default function Admin() {
     return () => { unsubPhotos(); unsubAvail(); unsubBook(); };
   }, []);
 
-  // ─── Auto-expire pending_payment ────────────────────────────────────────────
+  // ─── Auto-expire pending_payment after delay ────────────────────────────────
   useEffect(() => {
     const interval = setInterval(async () => {
       const now = new Date();
       const toExpire = bookings.filter(b => {
-        const s = b.status || b.statutReservation;
-        if (!['pending_payment', 'en_attente_paiement'].includes(s)) return false;
+        if (b.status !== 'pending_payment') return false;
         const created = b.createdAt?.toDate?.();
         if (!created) return false;
         return differenceInMinutes(now, created) >= PAYMENT_EXPIRY_MINUTES;
       });
       for (const b of toExpire) {
-        await updateDoc(doc(db, 'bookings', b.id), { status: 'expired', statutReservation: 'expire', autoExpiredAt: serverTimestamp() });
+        await updateDoc(doc(db, 'bookings', b.id), { status: 'expired', autoExpiredAt: serverTimestamp() });
         await freeSlotInAvailability(b.date, b.time);
         await addBookingHistory(b.id, 'Expiré automatiquement (délai paiement dépassé)');
         toast(`⏱ RDV de ${b.name} expiré automatiquement`, { icon: '🕐' });
       }
-    }, 60_000);
+    }, 60_000); // check every minute
     return () => clearInterval(interval);
   }, [bookings]);
 
   // ─── Auto-complete past confirmed bookings ──────────────────────────────────
   useEffect(() => {
     const toComplete = bookings.filter(b => {
-      const s = b.status || b.statutReservation;
-      if (!['confirmed', 'acompte_paye', 'paye_entierement'].includes(s)) return false;
+      if (b.status !== 'confirmed') return false;
       try {
         const dt = parseISO(`${b.date}T${b.time}:00`);
         return isPast(dt);
@@ -530,27 +411,31 @@ export default function Admin() {
     });
   }, [bookings]);
 
-  // ─── Auto-delete old archived ────────────────────────────────────────────────
+  // ─── Auto-delete archived bookings older than AUTO_DELETE_AFTER_DAYS ────────
   useEffect(() => {
     const toDelete = bookings.filter(b => {
-      if ((b.status || b.statutReservation) !== 'archived') return false;
+      if (b.status !== 'archived') return false;
       const archivedAt = b.archivedAt?.toDate?.();
       if (!archivedAt) return false;
       return differenceInDays(new Date(), archivedAt) >= AUTO_DELETE_AFTER_DAYS;
     });
-    toDelete.forEach(async b => { await deleteDoc(doc(db, 'bookings', b.id)); });
+    toDelete.forEach(async b => {
+      await deleteDoc(doc(db, 'bookings', b.id));
+    });
   }, [bookings]);
 
-  // ─── Reminders ───────────────────────────────────────────────────────────────
+  // ─── Notification: WhatsApp reminder 24h before ──────────────────────────────
+  // (Stores a flag so we don't spam)
   useEffect(() => {
     const now = new Date();
-    bookings.filter(b => (b.status || b.statutReservation) === 'confirmed' && !b.reminderSent).forEach(async b => {
+    bookings.filter(b => b.status === 'confirmed' && !b.reminderSent).forEach(async b => {
       try {
         const dt = parseISO(`${b.date}T${b.time}:00`);
         const hoursUntil = (dt - now) / 3_600_000;
         if (hoursUntil <= REMINDER_HOURS_BEFORE && hoursUntil > 0) {
           await updateDoc(doc(db, 'bookings', b.id), { reminderSent: true });
           await addBookingHistory(b.id, `Rappel WhatsApp envoyé (${REMINDER_HOURS_BEFORE}h avant)`);
+          // Admin can send manually via button; this just flags it
           toast(`📩 Rappel dû pour ${b.name} (${b.date} ${b.time})`, { duration: 6000 });
         }
       } catch {}
@@ -562,7 +447,7 @@ export default function Admin() {
   // ─── Slot helpers ────────────────────────────────────────────────────────────
   const getSlotsForDate = (dateStr) => availability[dateStr]?.slots || [];
   const getBookedSlotsForDate = (dateStr) =>
-    bookings.filter(b => b.date === dateStr && !['cancelled','expired','archived','cancellation_requested','annule','expire'].includes(b.status || b.statutReservation)).map(b => b.time);
+    bookings.filter(b => b.date === dateStr && !['cancelled','expired','archived','cancellation_requested'].includes(b.status)).map(b => b.time);
 
   const toggleSlot = async (dateStr, slot) => {
     const current = getSlotsForDate(dateStr);
@@ -598,7 +483,7 @@ export default function Admin() {
 
   const releaseSlot = async (booking) => {
     if (!confirm(`Annuler la réservation de ${booking.name} (${booking.time} le ${booking.date}) et rouvrir le créneau ?`)) return;
-    await updateDoc(doc(db, 'bookings', booking.id), { status: 'cancelled', statutReservation: 'annule', cancelledByAdmin: true, updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'bookings', booking.id), { status: 'cancelled', cancelledByAdmin: true, updatedAt: serverTimestamp() });
     await freeSlotInAvailability(booking.date, booking.time);
     await addBookingHistory(booking.id, 'Annulé par l\'admin — créneau libéré');
     toast.success('Réservation annulée et créneau libéré');
@@ -606,7 +491,7 @@ export default function Admin() {
 
   const expireBooking = async (booking) => {
     if (!confirm(`Marquer la réservation de ${booking.name} comme expirée et libérer le créneau ?`)) return;
-    await updateDoc(doc(db, 'bookings', booking.id), { status: 'expired', statutReservation: 'expire', updatedAt: serverTimestamp() });
+    await updateDoc(doc(db, 'bookings', booking.id), { status: 'expired', updatedAt: serverTimestamp() });
     await freeSlotInAvailability(booking.date, booking.time);
     await addBookingHistory(booking.id, 'Marqué expiré manuellement');
     toast.success('Réservation expirée — créneau libéré');
@@ -679,27 +564,25 @@ export default function Admin() {
 
   const handleEditSave = async (form) => {
     const b = editModal;
-    const prevDate = b.date;
-    const prevTime = b.time;
+    const prev = { date: b.date, time: b.time, status: b.status, acompte: b.acompte };
 
+    // If date or time changed, handle availability
     if (form.date !== b.date || form.time !== b.time) {
+      // Check for double booking
       const conflicting = bookings.find(x =>
         x.id !== b.id &&
         x.date === form.date &&
         x.time === form.time &&
-        !['cancelled','expired','archived','completed','annule','expire'].includes(x.status || x.statutReservation)
+        !['cancelled','expired','archived','completed'].includes(x.status)
       );
       if (conflicting) { toast.error('Ce créneau est déjà réservé !'); return; }
       await freeSlotInAvailability(b.date, b.time);
+      // Block new slot
       const newSlots = getSlotsForDate(form.date);
       const updated = newSlots.filter(s => s !== form.time);
       if (updated.length === 0) await deleteDoc(doc(db, 'availability', form.date)).catch(() => {});
       else await setDoc(doc(db, 'availability', form.date), { slots: updated, updatedAt: serverTimestamp() }, { merge: true });
     }
-
-    const montantPayeNum = form.montantPaye ? Number(form.montantPaye) : getMontantPaye(b);
-    const montantTotalNum = form.montantTotal ? Number(form.montantTotal) : getMontantTotal(b);
-    const resteNum = Math.max(0, montantTotalNum - montantPayeNum);
 
     await updateDoc(doc(db, 'bookings', b.id), {
       name: form.name,
@@ -707,19 +590,16 @@ export default function Admin() {
       service: form.service,
       date: form.date,
       time: form.time,
-      montantPaye: montantPayeNum,
-      montantTotal: montantTotalNum,
-      resteAPayer: resteNum,
-      acompte: montantPayeNum, // rétrocompat
+      acompte: form.acompte ? Number(form.acompte) : null,
       status: form.status,
       updatedAt: serverTimestamp(),
     });
 
     const changes = {};
-    if (form.date !== prevDate) changes.date = `${prevDate} → ${form.date}`;
-    if (form.time !== prevTime) changes.time = `${prevTime} → ${form.time}`;
-    if (form.status !== (b.status || b.statutReservation)) changes.statut = `${STATUS_LABEL[b.status || b.statutReservation]} → ${STATUS_LABEL[form.status]}`;
-    if (montantPayeNum !== getMontantPaye(b)) changes['montant payé'] = `${getMontantPaye(b)} → ${montantPayeNum} FCFA`;
+    if (form.date !== prev.date) changes.date = `${prev.date} → ${form.date}`;
+    if (form.time !== prev.time) changes.time = `${prev.time} → ${form.time}`;
+    if (form.status !== prev.status) changes.statut = `${STATUS_LABEL[prev.status]} → ${STATUS_LABEL[form.status]}`;
+    if (String(form.acompte) !== String(prev.acompte)) changes.acompte = `${prev.acompte} → ${form.acompte}`;
     await addBookingHistory(b.id, 'Modifié par l\'admin', changes);
 
     toast.success('Réservation mise à jour !');
@@ -756,19 +636,12 @@ export default function Admin() {
   // ─── Stats ────────────────────────────────────────────────────────────────────
   const totalAvailableSlots = Object.values(availability).reduce((acc, d) => acc + (d.slots?.length || 0), 0);
   const totalAvailableDays = Object.keys(availability).length;
-  const pendingProofs = bookings.filter(b => ['waiting_confirmation','acompte_paye','paye_entierement'].includes(b.status || b.statutReservation)).length;
-  const pendingCancels = bookings.filter(b => (b.status || b.statutReservation) === 'cancellation_requested').length;
-  const activeBookings = bookings.filter(b => !['cancelled','expired','archived','completed','annule','expire'].includes(b.status || b.statutReservation)).length;
-  const pendingPayment = bookings.filter(b => ['pending_payment','en_attente_paiement'].includes(b.status || b.statutReservation)).length;
-
-  // Chiffre d'affaires encaissé (acomptes + paiements complets)
-  const totalEncaisse = bookings
-    .filter(b => !['cancelled','expired','archived','annule','expire'].includes(b.status || b.statutReservation))
-    .reduce((acc, b) => acc + getMontantPaye(b), 0);
-
+  const pendingProofs = bookings.filter(b => b.status === 'waiting_confirmation').length;
+  const pendingCancels = bookings.filter(b => b.status === 'cancellation_requested').length;
+  const activeBookings = bookings.filter(b => !['cancelled','expired','archived','completed'].includes(b.status)).length;
+  const pendingPayment = bookings.filter(b => b.status === 'pending_payment').length;
   const dueSoonReminders = bookings.filter(b => {
-    if ((b.status || b.statutReservation) !== 'confirmed') return false;
-    if (b.reminderSent) return false;
+    if (b.status !== 'confirmed' || b.reminderSent) return false;
     try {
       const dt = parseISO(`${b.date}T${b.time}:00`);
       const h = (dt - new Date()) / 3_600_000;
@@ -777,13 +650,10 @@ export default function Admin() {
   });
 
   // ─── Filtered/sorted bookings ────────────────────────────────────────────────
-  const getEffectiveStatus = (b) => b.status || b.statutReservation || 'pending_payment';
-
   const filteredBookings = bookings
     .filter(b => {
-      const s = getEffectiveStatus(b);
-      if (!showArchived && s === 'archived') return false;
-      if (statusFilter && s !== statusFilter) return false;
+      if (!showArchived && b.status === 'archived') return false;
+      if (statusFilter && b.status !== statusFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         return (
@@ -795,15 +665,16 @@ export default function Admin() {
       }
       return true;
     })
-    .sort((a, b_) => {
+    .sort((a, b) => {
       const da = a.createdAt?.toDate?.() || new Date(0);
-      const db_ = b_.createdAt?.toDate?.() || new Date(0);
+      const db_ = b.createdAt?.toDate?.() || new Date(0);
       return sortOrder === 'desc' ? db_ - da : da - db_;
     });
 
+  // ─── Bulk archive expired/cancelled ─────────────────────────────────────────
   const bulkArchiveOld = async () => {
     if (!confirm('Archiver toutes les réservations annulées et expirées ?')) return;
-    const toArchive = bookings.filter(b => ['cancelled','expired','annule','expire'].includes(getEffectiveStatus(b)));
+    const toArchive = bookings.filter(b => ['cancelled','expired'].includes(b.status));
     for (const b of toArchive) {
       await updateDoc(doc(db, 'bookings', b.id), { status: 'archived', archivedAt: serverTimestamp() });
     }
@@ -841,11 +712,11 @@ export default function Admin() {
             { label: 'En attente paiement', value: pendingPayment, color: pendingPayment > 0 ? '#E8A44C' : '#8A7968', alert: pendingPayment > 0 },
             { label: 'Preuves à valider', value: pendingProofs, color: pendingProofs > 0 ? '#E8A44C' : '#8A7968', alert: pendingProofs > 0 },
             { label: 'Annulations', value: pendingCancels, color: pendingCancels > 0 ? '#E74C3C' : '#8A7968', alert: pendingCancels > 0 },
-            { label: 'Encaissé (acomptes)', value: `${totalEncaisse.toLocaleString()} F`, color: '#25D366', small: true },
+            { label: 'Photos publiées', value: photos.length, color: '#D4956A' },
           ].map((stat) => (
             <div key={stat.label} style={{ background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: stat.alert ? '1px solid rgba(232,164,76,0.4)' : '1px solid rgba(201,168,76,0.12)', borderRadius: '4px', padding: '22px 26px', position: 'relative', overflow: 'hidden' }}>
               {stat.alert && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #E8A44C, #C9A84C)' }} />}
-              <div style={{ fontFamily: stat.small ? 'Jost, sans-serif' : 'Cormorant Garamond, serif', fontSize: stat.small ? '22px' : '42px', color: stat.color, lineHeight: 1, marginBottom: '4px', fontWeight: stat.small ? 600 : 400 }}>{stat.value}</div>
+              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '42px', color: stat.color, lineHeight: 1, marginBottom: '4px' }}>{stat.value}</div>
               {stat.sub && <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: stat.color, opacity: 0.6, marginBottom: '4px' }}>{stat.sub}</div>}
               <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968' }}>{stat.label}</div>
             </div>
@@ -910,7 +781,7 @@ export default function Admin() {
                       const inMonth = isSameMonth(date, calendarDate);
                       const isTodayDate = isSameDay(date, new Date());
                       const freeSlots = slots.filter(s => !booked.includes(s)).length;
-                      const dayBookings = bookings.filter(b => b.date === dateStr && !['cancelled','expired','archived','annule','expire'].includes(getEffectiveStatus(b)));
+                      const dayBookings = bookings.filter(b => b.date === dateStr && !['cancelled','expired','archived'].includes(b.status));
 
                       return (
                         <motion.button key={dateStr} onClick={() => setEditingDate(isEditing ? null : dateStr)} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} style={{
@@ -925,7 +796,7 @@ export default function Admin() {
                           {dayBookings.length > 0 && (
                             <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '2px' }}>
                               {dayBookings.slice(0, 3).map(b => (
-                                <div key={b.id} style={{ width: '6px', height: '6px', borderRadius: '50%', background: STATUS_COLOR[getEffectiveStatus(b)] || '#C9A84C' }} />
+                                <div key={b.id} style={{ width: '6px', height: '6px', borderRadius: '50%', background: STATUS_COLOR[b.status] || '#C9A84C' }} />
                               ))}
                               {dayBookings.length > 3 && <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: '#8A7968' }}>+{dayBookings.length - 3}</span>}
                             </div>
@@ -999,7 +870,7 @@ export default function Admin() {
                       {ALL_SLOTS.map((slot) => {
                         const isOpen = getSlotsForDate(editingDate).includes(slot);
                         const isBooked = getBookedSlotsForDate(editingDate).includes(slot);
-                        const bookingForSlot = bookings.find(b => b.date === editingDate && b.time === slot && !['cancelled','expired','archived','annule','expire'].includes(getEffectiveStatus(b)));
+                        const bookingForSlot = bookings.find(b => b.date === editingDate && b.time === slot && !['cancelled','expired','archived'].includes(b.status));
                         return (
                           <div key={slot} style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
                             <motion.button onClick={() => !isBooked && toggleSlot(editingDate, slot)} whileHover={!isBooked ? { scale: 1.08 } : {}} whileTap={!isBooked ? { scale: 0.95 } : {}} disabled={isBooked}
@@ -1177,7 +1048,7 @@ export default function Admin() {
                     </button>
                   )}
                 </div>
-                <button onClick={() => setSortOrder(s => s === 'desc' ? 'asc' : 'desc')} style={{ padding: '10px 16px', background: 'transparent', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '2px', color: '#8A7968', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.1em' }}>
+                <button onClick={() => setSortOrder(s => s === 'desc' ? 'asc' : 'desc')} title="Trier" style={{ padding: '10px 16px', background: 'transparent', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '2px', color: '#8A7968', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.1em' }}>
                   {sortOrder === 'desc' ? <SortDesc size={13} /> : <SortAsc size={13} />}
                   {sortOrder === 'desc' ? 'Récent' : 'Ancien'}
                 </button>
@@ -1185,10 +1056,12 @@ export default function Admin() {
 
               {/* Status filters */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                {[null, 'pending_payment', 'en_attente_paiement', 'waiting_confirmation', 'acompte_paye', 'paye_entierement', 'confirmed', 'completed', 'cancellation_requested', 'cancelled', 'expired', ...(showArchived ? ['archived'] : [])].filter((v, i, arr) => arr.indexOf(v) === i).map(s => (
+                {[null, 'pending_payment', 'waiting_confirmation', 'confirmed', 'completed', 'cancellation_requested', 'cancelled', 'expired', ...(showArchived ? ['archived'] : [])].map(s => (
                   <button key={s || 'all'} onClick={() => setStatusFilter(s)}
                     style={{ padding: '6px 13px', background: statusFilter === s ? (s ? `${STATUS_COLOR[s]}22` : 'rgba(201,168,76,0.12)') : 'transparent', border: statusFilter === s ? `1px solid ${s ? STATUS_COLOR[s] : '#C9A84C'}66` : '1px solid rgba(201,168,76,0.15)', color: statusFilter === s ? (s ? STATUS_COLOR[s] : '#C9A84C') : '#8A7968', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s' }}>
-                    {s ? (STATUS_LABEL[s] || s) : 'Tous'}
+                    {s ? STATUS_LABEL[s] : 'Tous'}
+                    {s === 'waiting_confirmation' && pendingProofs > 0 && ` (${pendingProofs})`}
+                    {s === 'cancellation_requested' && pendingCancels > 0 && ` (${pendingCancels})`}
                   </button>
                 ))}
               </div>
@@ -1198,15 +1071,11 @@ export default function Admin() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {filteredBookings.map((b) => {
-                    const effectiveStatus = getEffectiveStatus(b);
-                    const isCancelReq = effectiveStatus === 'cancellation_requested';
-                    const isWaiting = ['waiting_confirmation','acompte_paye','paye_entierement'].includes(effectiveStatus);
-                    const isCompleted = effectiveStatus === 'completed';
-                    const isArchived = effectiveStatus === 'archived';
+                    const isCancelReq = b.status === 'cancellation_requested';
+                    const isWaiting = b.status === 'waiting_confirmation';
+                    const isCompleted = b.status === 'completed';
+                    const isArchived = b.status === 'archived';
                     const isDueSoon = dueSoonReminders.some(r => r.id === b.id);
-                    const montantP = getMontantPaye(b);
-                    const montantT = getMontantTotal(b);
-                    const resteP = getResteAPayer(b);
 
                     return (
                       <motion.div key={b.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -1235,6 +1104,7 @@ export default function Admin() {
                             <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '3px' }}>
                               <Calendar size={10} />{b.date} à {b.time}
                             </div>
+                            {b.acompte && <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', marginTop: '3px' }}>Acompte: {b.acompte?.toLocaleString()} FCFA</div>}
                             {isDueSoon && (
                               <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '9px', color: '#C9A84C', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '3px' }}>
                                 <Bell size={9} /> RDV proche — rappel recommandé
@@ -1242,13 +1112,9 @@ export default function Admin() {
                             )}
                           </div>
 
-                          {/* Status + paiement */}
+                          {/* Status + proof */}
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                            <StatusBadge status={effectiveStatus} />
-
-                            {/* ── Bloc paiement ── */}
-                            <PaymentBadge booking={b} />
-
+                            <StatusBadge status={b.status || 'pending_payment'} />
                             {b.proofUrl && (
                               <button onClick={() => setProofViewer(b.proofUrl)} style={{ padding: '4px 10px', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)', color: '#C9A84C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', width: 'fit-content' }}>
                                 <Eye size={10} /> Voir preuve
@@ -1258,13 +1124,14 @@ export default function Admin() {
 
                           {/* Actions */}
                           <div style={{ display: 'flex', gap: '6px', flexDirection: 'column', minWidth: '130px' }}>
+                            {/* Edit always available */}
                             {!isArchived && (
                               <button onClick={() => setEditModal(b)} style={{ padding: '7px 12px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#FAF6EF', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                 <Edit3 size={10} /> Modifier
                               </button>
                             )}
 
-                            {['waiting_confirmation','acompte_paye','paye_entierement'].includes(effectiveStatus) && (
+                            {b.status === 'waiting_confirmation' && (
                               <>
                                 <button onClick={() => updateBookingStatus(b.id, 'confirmed')} style={{ padding: '7px 12px', background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', color: '#25D366', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                   <Check size={10} /> Confirmer
@@ -1275,7 +1142,7 @@ export default function Admin() {
                               </>
                             )}
 
-                            {effectiveStatus === 'cancellation_requested' && (
+                            {b.status === 'cancellation_requested' && (
                               <>
                                 <button onClick={() => acceptCancellation(b)} style={{ padding: '7px 12px', background: 'rgba(231,76,60,0.12)', border: '1px solid rgba(231,76,60,0.4)', color: '#E74C3C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', fontWeight: 600 }}>
                                   ✓ Accepter annulation
@@ -1286,7 +1153,7 @@ export default function Admin() {
                               </>
                             )}
 
-                            {effectiveStatus === 'confirmed' && (
+                            {b.status === 'confirmed' && (
                               <>
                                 <button onClick={() => setReassignModal({ booking: b, currentDate: b.date, currentTime: b.time })} style={{ padding: '7px 12px', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#C9A84C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                   <RefreshCw size={10} /> Déplacer
@@ -1300,13 +1167,14 @@ export default function Admin() {
                               </>
                             )}
 
-                            {['pending_payment','en_attente_paiement'].includes(effectiveStatus) && (
+                            {b.status === 'pending_payment' && (
                               <button onClick={() => expireBooking(b)} style={{ padding: '7px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#555', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer' }}>
                                 Marquer expiré
                               </button>
                             )}
 
-                            {['cancelled','expired','completed','annule','expire'].includes(effectiveStatus) && (
+                            {/* Archive / delete for terminated */}
+                            {['cancelled','expired','completed'].includes(b.status) && (
                               <button onClick={() => archiveBooking(b)} style={{ padding: '7px 12px', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#8A7968', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                 <Archive size={10} /> Archiver
                               </button>
@@ -1317,6 +1185,11 @@ export default function Admin() {
                                 <Trash2 size={10} /> Supprimer
                               </button>
                             )}
+
+                            {/* History */}
+                            /*<button onClick={() => setHistoryModal(b)} style={{ padding: '7px 12px', background: 'transparent', border: '1px solid rgba(255,255,255,0.06)', color: '#555', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <History size={10} /> Historique
+                            </button>
                           </div>
                         </div>
                       </motion.div>
@@ -1417,8 +1290,6 @@ export default function Admin() {
           div[style*="grid-template-columns: 1fr 1fr auto"] { grid-template-columns: 1fr !important; }
         }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
-        input[type="number"]::-webkit-inner-spin-button,
-        input[type="number"]::-webkit-outer-spin-button { opacity: 0.4; }
       `}</style>
     </div>
   );
