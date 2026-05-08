@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 4,
+            "activePatchIndex": 7,
             "patches": [
                 {
                     "date": 1778167597066,
@@ -24,6 +24,18 @@
                 {
                     "date": 1778172821056,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,7 +1,9 @@\n // Import the functions you need from the SDKs you need\n import { initializeApp } from \"firebase/app\";\n import { getFirestore } from \"firebase/firestore\";\n+import { getAuth } from \"firebase/auth\";\n+import { getStorage } from \"firebase/storage\";\n // TODO: Add SDKs for Firebase products that you want to use\n // https://firebase.google.com/docs/web/setup#available-libraries\n \n // Your web app's Firebase configuration\n"
+                },
+                {
+                    "date": 1778250254312,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -10,9 +10,9 @@\n const firebaseConfig = {\n   apiKey: \"AIzaSyBAeLHHFyK7LW0INvPBqj9oujzbs8ggxSw\",\n   authDomain: \"magical-hand.firebaseapp.com\",\n   projectId: \"magical-hand\",\n-  storageBucket: \"magical-hand.firebasestorage.app\",\n+  storageBucket: \"magical-hand.appspot.com\",\n   messagingSenderId: \"60199255400\",\n   appId: \"1:60199255400:web:9d957c53743a7f2ac32add\"\n };\n \n"
+                },
+                {
+                    "date": 1778250472848,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -10,9 +10,9 @@\n const firebaseConfig = {\n   apiKey: \"AIzaSyBAeLHHFyK7LW0INvPBqj9oujzbs8ggxSw\",\n   authDomain: \"magical-hand.firebaseapp.com\",\n   projectId: \"magical-hand\",\n-  storageBucket: \"magical-hand.appspot.com\",\n+  storageBucket: \"magical-hand.firebasestorage.app\",\n   messagingSenderId: \"60199255400\",\n   appId: \"1:60199255400:web:9d957c53743a7f2ac32add\"\n };\n \n"
+                },
+                {
+                    "date": 1778251717385,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -10,9 +10,9 @@\n const firebaseConfig = {\n   apiKey: \"AIzaSyBAeLHHFyK7LW0INvPBqj9oujzbs8ggxSw\",\n   authDomain: \"magical-hand.firebaseapp.com\",\n   projectId: \"magical-hand\",\n-  storageBucket: \"magical-hand.firebasestorage.app\",\n+  storageBucket: \"magical-hand.appspot.com\",\n   messagingSenderId: \"60199255400\",\n   appId: \"1:60199255400:web:9d957c53743a7f2ac32add\"\n };\n \n"
                 }
             ],
             "date": 1778167597066,
