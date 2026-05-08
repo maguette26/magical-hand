@@ -61,11 +61,12 @@ export default function Gallery() {
       {/* HEADER */}
       <div className="ig-header">
         <h2>Mes Créations</h2>
-       <p>Balayez les photos pour découvrir tous les looks ✨</p>
+       
       </div>
 
       {/* FILTERS */}
       <div className="ig-filters">
+         <p>Swipe pour découvrir mes looks</p>
         {CATEGORIES.map(cat => (
           <button
             key={cat}

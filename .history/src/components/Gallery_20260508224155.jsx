@@ -61,7 +61,7 @@ export default function Gallery() {
       {/* HEADER */}
       <div className="ig-header">
         <h2>Mes Créations</h2>
-       <p>Balayez les photos pour découvrir tous les looks ✨</p>
+        <p>Swipe pour découvrir mes looks</p>
       </div>
 
       {/* FILTERS */}

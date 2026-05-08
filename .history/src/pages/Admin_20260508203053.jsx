@@ -11,11 +11,10 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Clock, X, Check, AlertTriangle, Eye, RefreshCw, Ban, RotateCcw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, X, Calendar, Edit3, Check, AlertTriangle, Image, Eye } from 'lucide-react';
 
 const CATEGORIES = ['Glam', 'Cérémonie', 'Naturel'];
 const ALL_SLOTS = ['08:00', '09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
-
 const TAB_STYLE = (active) => ({
   padding: '12px 24px',
   background: active ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'transparent',
@@ -35,45 +34,15 @@ const STATUS_COLOR = {
   pending_payment: '#C9A84C',
   waiting_confirmation: '#E8A44C',
   confirmed: '#25D366',
-  cancellation_requested: '#E74C3C',
-  cancelled: '#555',
-  expired: '#444',
+  cancelled: '#E74C3C',
 };
 
 const STATUS_LABEL = {
   pending_payment: 'En attente paiement',
   waiting_confirmation: 'Preuve envoyée',
   confirmed: 'Confirmé',
-  cancellation_requested: 'Annulation demandée',
   cancelled: 'Annulé',
-  expired: 'Expiré',
 };
-
-const labelStyle = {
-  fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.15em',
-  textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '8px',
-};
-const inputStyle = {
-  width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.03)',
-  border: '1px solid rgba(201,168,76,0.25)', borderRadius: '2px', color: '#FAF6EF',
-  fontFamily: 'Jost, sans-serif', fontSize: '14px', outline: 'none', boxSizing: 'border-box', transition: 'border 0.3s',
-};
-
-// ─── Helper: free the slot in availability when a booking is cancelled ───────
-async function freeSlotInAvailability(date, time) {
-  if (!date || !time) return;
-  try {
-    const availRef = doc(db, 'availability', date);
-    const snap = await getDoc(availRef);
-    if (!snap.exists()) return;
-    const slots = snap.data().slots || [];
-    if (!slots.includes(time)) {
-      await setDoc(availRef, { slots: [...slots, time].sort(), updatedAt: serverTimestamp() }, { merge: true });
-    }
-  } catch (err) {
-    console.error('freeSlot error:', err);
-  }
-}
 
 export default function Admin() {
   const [tab, setTab] = useState('disponibilites');
@@ -87,20 +56,17 @@ export default function Admin() {
 
   // Calendar
   const [calendarDate, setCalendarDate] = useState(new Date());
-  const [calView, setCalView] = useState('month');
+  const [calView, setCalView] = useState('month'); // 'month' | 'week'
   const [editingDate, setEditingDate] = useState(null);
   const [calOffset, setCalOffset] = useState(0);
 
   // Slot reassign modal
-  const [reassignModal, setReassignModal] = useState(null);
+  const [reassignModal, setReassignModal] = useState(null); // { booking, currentDate, currentTime }
   const [newSlotDate, setNewSlotDate] = useState('');
   const [newSlotTime, setNewSlotTime] = useState('');
 
   // Proof viewer
   const [proofViewer, setProofViewer] = useState(null);
-
-  // Booking filter
-  const [statusFilter, setStatusFilter] = useState(null);
 
   const [editingPhoto, setEditingPhoto] = useState(null);
   const fileRef = useRef();
@@ -108,6 +74,7 @@ export default function Admin() {
 
   const visibleWeek = Array.from({ length: 7 }, (_, i) => addDays(new Date(), calOffset * 7 + i + 1));
 
+  // Calendar month grid
   const monthStart = startOfMonth(calendarDate);
   const monthEnd = endOfMonth(calendarDate);
   const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
@@ -138,12 +105,12 @@ export default function Admin() {
     navigate('/admin/login');
   };
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
+  // ---- HELPERS ----
   const getSlotsForDate = (dateStr) => availability[dateStr]?.slots || [];
   const getBookedSlotsForDate = (dateStr) =>
-    bookings.filter(b => b.date === dateStr && !['cancelled', 'expired', 'cancellation_requested'].includes(b.status)).map(b => b.time);
+    bookings.filter(b => b.date === dateStr && !['cancelled'].includes(b.status)).map(b => b.time);
 
-  // ─── Availability ────────────────────────────────────────────────────────────
+  // ---- AVAILABILITY ----
   const toggleSlot = async (dateStr, slot) => {
     const current = getSlotsForDate(dateStr);
     const booked = getBookedSlotsForDate(dateStr);
@@ -165,102 +132,38 @@ export default function Admin() {
     }
   };
 
-  // Block a specific slot (remove from availability, does not touch bookings)
-  const blockSlot = async (dateStr, slot) => {
-    const current = getSlotsForDate(dateStr);
-    const booked = getBookedSlotsForDate(dateStr);
-    if (booked.includes(slot)) { toast.error('Créneau réservé. Libérez la réservation d\'abord.'); return; }
-    const updated = current.filter(s => s !== slot);
-    if (updated.length === 0) {
-      await deleteDoc(doc(db, 'availability', dateStr)).catch(() => {});
-    } else {
-      await setDoc(doc(db, 'availability', dateStr), { slots: updated, updatedAt: serverTimestamp() });
-    }
-    toast.success(`Créneau ${slot} bloqué`);
-  };
-
-  // Reopen a slot (add back to availability)
-  const reopenSlot = async (dateStr, slot) => {
-    const current = getSlotsForDate(dateStr);
-    if (current.includes(slot)) { toast('Créneau déjà ouvert'); return; }
-    await setDoc(doc(db, 'availability', dateStr), { slots: [...current, slot].sort(), updatedAt: serverTimestamp() }, { merge: true });
-    toast.success(`Créneau ${slot} rouvert`);
-  };
-
-  // Release a booking (cancel it + free the slot)
+  // Release a specific slot back to available (remove booking, keep slot open)
   const releaseSlot = async (booking) => {
-    if (!confirm(`Annuler la réservation de ${booking.name} (${booking.time} le ${booking.date}) et rouvrir le créneau ?`)) return;
-    await updateDoc(doc(db, 'bookings', booking.id), { status: 'cancelled', cancelledByAdmin: true, updatedAt: serverTimestamp() });
-    await freeSlotInAvailability(booking.date, booking.time);
-    toast.success('Réservation annulée et créneau libéré');
-  };
-
-  // Mark a booking as expired + free slot
-  const expireBooking = async (booking) => {
-    if (!confirm(`Marquer la réservation de ${booking.name} comme expirée et libérer le créneau ?`)) return;
-    await updateDoc(doc(db, 'bookings', booking.id), { status: 'expired', updatedAt: serverTimestamp() });
-    await freeSlotInAvailability(booking.date, booking.time);
-    toast.success('Réservation expirée — créneau libéré');
+    if (!confirm(`Libérer le créneau ${booking.time} du ${booking.date} ?`)) return;
+    await updateDoc(doc(db, 'bookings', booking.id), { status: 'cancelled' });
+    toast.success('Créneau libéré');
   };
 
   // Reassign booking to a new date/time
   const handleReassign = async () => {
     if (!newSlotDate || !newSlotTime) { toast.error('Choisissez une date et une heure'); return; }
     const { booking } = reassignModal;
+    // Check new slot is available
     const newSlots = getSlotsForDate(newSlotDate);
     if (!newSlots.includes(newSlotTime)) { toast.error('Ce créneau n\'est pas ouvert dans les disponibilités'); return; }
-    const alreadyBooked = getBookedSlotsForDate(newSlotDate).filter(t => !(booking.date === newSlotDate && booking.time === t));
+    const alreadyBooked = getBookedSlotsForDate(newSlotDate).filter(t => t !== booking.time || booking.date !== newSlotDate);
     if (alreadyBooked.includes(newSlotTime)) { toast.error('Ce créneau est déjà réservé'); return; }
-
-    // Free old slot, update booking
-    const oldDate = booking.date;
-    const oldTime = booking.time;
 
     await updateDoc(doc(db, 'bookings', booking.id), {
       date: newSlotDate,
       time: newSlotTime,
       rescheduledAt: serverTimestamp(),
     });
-
-    // Reopen old slot
-    await freeSlotInAvailability(oldDate, oldTime);
-    // Remove new slot from availability (it's now taken)
-    const newSlotsUpdated = newSlots.filter(s => s !== newSlotTime);
-    if (newSlotsUpdated.length === 0) {
-      await deleteDoc(doc(db, 'availability', newSlotDate)).catch(() => {});
-    } else {
-      await setDoc(doc(db, 'availability', newSlotDate), { slots: newSlotsUpdated, updatedAt: serverTimestamp() }, { merge: true });
-    }
-
-    // Notify client
-    const phone = booking.phone?.replace(/\s/g, '');
-    if (phone) {
-      const cleanPhone = phone.startsWith('+') ? phone.slice(1) : phone.startsWith('00') ? phone.slice(2) : `221${phone}`;
-      const msg =
-`✨ *MAGICAL HAND BY MAMIFA* ✨
-━━━━━━━━━━━━━━━━━━━
-Bonjour *${booking.name}* 💄
-
-Votre rendez-vous a été *déplacé* 📅
-
-💋 Prestation : ${booking.service}
-📅 Nouveau créneau : ${newSlotDate} à ${newSlotTime}
-
-Pour toute question, répondez à ce message.
-_Magical Hand by Mamifa_ ✨`;
-      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-    }
-
     toast.success('Rendez-vous déplacé !');
     setReassignModal(null);
     setNewSlotDate('');
     setNewSlotTime('');
   };
 
-  // ─── Bookings ────────────────────────────────────────────────────────────────
+  // ---- BOOKINGS ----
   const notifyClientWhatsApp = (booking, status) => {
     const phone = booking.phone?.replace(/\s/g, '');
-    if (!phone) return;
+    if (!phone) return; // pas de numéro → pas de notif
     const cleanPhone = phone.startsWith('+') ? phone.slice(1) : phone.startsWith('00') ? phone.slice(2) : `221${phone}`;
 
     let message = '';
@@ -286,6 +189,8 @@ Bonjour *${booking.name}*,
 
 Malheureusement votre réservation du *${booking.date} à ${booking.time}* n'a pas pu être confirmée.
 
+Cela peut être dû à un problème avec la preuve de paiement ou à une indisponibilité.
+
 N'hésitez pas à nous recontacter pour fixer un nouveau rendez-vous.
 
 _Magical Hand by Mamifa_ 💄`;
@@ -295,44 +200,16 @@ _Magical Hand by Mamifa_ 💄`;
   };
 
   const updateBookingStatus = async (id, status) => {
-    const booking = bookings.find(b => b.id === id);
     await updateDoc(doc(db, 'bookings', id), { status, updatedAt: serverTimestamp() });
     toast.success(`RDV : ${STATUS_LABEL[status]}`);
-
-    // Auto-free slot when cancelling
-    if (status === 'cancelled' || status === 'expired') {
-      if (booking) await freeSlotInAvailability(booking.date, booking.time);
-    }
-
+    // Find the booking and notify client
+    const booking = bookings.find(b => b.id === id);
     if (booking && (status === 'confirmed' || status === 'cancelled')) {
       notifyClientWhatsApp(booking, status);
     }
   };
 
-  // Accept cancellation request → cancel + free slot
-  const acceptCancellation = async (booking) => {
-    await updateDoc(doc(db, 'bookings', booking.id), { status: 'cancelled', cancellationApprovedAt: serverTimestamp() });
-    await freeSlotInAvailability(booking.date, booking.time);
-    toast.success('Annulation acceptée — créneau libéré');
-    // Notify client
-    notifyClientWhatsApp(booking, 'cancelled');
-  };
-
-  // Reject cancellation request → revert to confirmed
-  const rejectCancellation = async (booking) => {
-    await updateDoc(doc(db, 'bookings', booking.id), { status: 'confirmed', cancellationRejectedAt: serverTimestamp() });
-    toast.success('Demande d\'annulation refusée — RDV maintenu');
-    const phone = booking.phone?.replace(/\s/g, '');
-    if (phone) {
-      const cleanPhone = phone.startsWith('+') ? phone.slice(1) : phone.startsWith('00') ? phone.slice(2) : `221${phone}`;
-      const msg =
-`✨ *MAGICAL HAND BY MAMIFA* ✨
-Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée. Votre rendez-vous du *${booking.date} à ${booking.time}* est maintenu. Contactez-nous pour plus d'informations.`;
-      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-    }
-  };
-
-  // ─── Photos ──────────────────────────────────────────────────────────────────
+  // ---- PHOTOS ----
   const handleUpload = async () => {
     if (!selectedFile || !newPhotoTitle.trim()) { toast.error("Ajoute un titre et une photo"); return; }
     setUploading(true);
@@ -359,16 +236,9 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
     } catch { toast.error("Erreur mise à jour"); }
   };
 
-  // Stats
   const totalAvailableSlots = Object.values(availability).reduce((acc, d) => acc + (d.slots?.length || 0), 0);
   const totalAvailableDays = Object.keys(availability).length;
   const pendingProofs = bookings.filter(b => b.status === 'waiting_confirmation').length;
-  const pendingCancels = bookings.filter(b => b.status === 'cancellation_requested').length;
-
-  // Filtered bookings
-  const filteredBookings = statusFilter
-    ? bookings.filter(b => b.status === statusFilter)
-    : bookings;
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0A' }}>
@@ -386,17 +256,16 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
 
       <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }}>
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '40px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '40px' }}>
           {[
             { label: 'Photos publiées', value: photos.length, color: '#C9A84C' },
             { label: 'Créneaux ouverts', value: totalAvailableSlots, sub: `${totalAvailableDays} jour${totalAvailableDays > 1 ? 's' : ''}`, color: '#E8C97A' },
-            { label: 'Réservations', value: bookings.filter(b => !['cancelled','expired'].includes(b.status)).length, color: '#D4956A' },
+            { label: 'Réservations', value: bookings.length, color: '#D4956A' },
             { label: 'Preuves à valider', value: pendingProofs, color: pendingProofs > 0 ? '#E8A44C' : '#8A7968', alert: pendingProofs > 0 },
-            { label: 'Annulations', value: pendingCancels, color: pendingCancels > 0 ? '#E74C3C' : '#8A7968', alert: pendingCancels > 0 },
           ].map((stat) => (
-            <div key={stat.label} style={{ background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: stat.alert ? '1px solid rgba(232,164,76,0.4)' : '1px solid rgba(201,168,76,0.12)', borderRadius: '4px', padding: '24px 28px', position: 'relative', overflow: 'hidden' }}>
+            <div key={stat.label} style={{ background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: stat.alert ? '1px solid rgba(232,164,76,0.4)' : '1px solid rgba(201,168,76,0.12)', borderRadius: '4px', padding: '28px 32px', position: 'relative', overflow: 'hidden' }}>
               {stat.alert && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #E8A44C, #C9A84C)' }} />}
-              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '44px', color: stat.color, lineHeight: 1, marginBottom: '4px' }}>{stat.value}</div>
+              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '48px', color: stat.color, lineHeight: 1, marginBottom: '4px' }}>{stat.value}</div>
               {stat.sub && <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: stat.color, opacity: 0.6, marginBottom: '4px' }}>{stat.sub}</div>}
               <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968' }}>{stat.label}</div>
             </div>
@@ -408,18 +277,19 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
           {[
             { id: 'disponibilites', label: 'Disponibilités' },
             { id: 'photos', label: 'Galerie Photos' },
-            { id: 'reservations', label: `Réservations${pendingProofs + pendingCancels > 0 ? ` (${pendingProofs + pendingCancels} 🔔)` : ''}` },
+            { id: 'reservations', label: `Réservations${pendingProofs > 0 ? ` (${pendingProofs} 🔔)` : ''}` },
           ].map((t) => (
             <button key={t.id} onClick={() => setTab(t.id)} style={TAB_STYLE(tab === t.id)}>{t.label}</button>
           ))}
         </div>
 
-        {/* ═════ DISPONIBILITÉS ═════ */}
+        {/* ===== DISPONIBILITÉS ===== */}
         {tab === 'disponibilites' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div style={{ background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '4px', padding: '36px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px', flexWrap: 'wrap', gap: '12px' }}>
                 <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '28px', color: '#FAF6EF', margin: 0 }}>Gérer vos disponibilités</h2>
+                {/* View toggle */}
                 <div style={{ display: 'flex', gap: '8px' }}>
                   {[{ id: 'month', label: 'Mois' }, { id: 'week', label: 'Semaine' }].map(v => (
                     <button key={v.id} onClick={() => setCalView(v.id)} style={{ padding: '8px 16px', background: calView === v.id ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'transparent', border: calView === v.id ? 'none' : '1px solid rgba(201,168,76,0.2)', color: calView === v.id ? '#0A0A0A' : '#8A7968', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s' }}>
@@ -429,12 +299,13 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
                 </div>
               </div>
               <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', marginBottom: '28px' }}>
-                Cliquez sur un jour pour ouvrir, fermer ou bloquer des créneaux. Les créneaux en rouge sont réservés.
+                Cliquez sur un jour pour ouvrir/fermer des créneaux. Les créneaux dorés sont disponibles à la réservation.
               </p>
 
-              {/* MONTH VIEW */}
+              {/* ── MONTH VIEW ── */}
               {calView === 'month' && (
                 <>
+                  {/* Month navigation */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
                     <button onClick={() => setCalendarDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1))} style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                       <ChevronLeft size={15} color="#C9A84C" />
@@ -447,12 +318,14 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
                     </button>
                   </div>
 
+                  {/* Day headers */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '4px' }}>
                     {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(d => (
                       <div key={d} style={{ textAlign: 'center', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8A7968', padding: '8px' }}>{d}</div>
                     ))}
                   </div>
 
+                  {/* Month grid */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', marginBottom: '24px' }}>
                     {calendarDays.map((date) => {
                       const dateStr = format(date, 'yyyy-MM-dd');
@@ -463,7 +336,7 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
                       const inMonth = isSameMonth(date, calendarDate);
                       const isToday = isSameDay(date, new Date());
                       const freeSlots = slots.filter(s => !booked.includes(s)).length;
-                      const dayBookings = bookings.filter(b => b.date === dateStr && !['cancelled','expired'].includes(b.status));
+                      const dayBookings = bookings.filter(b => b.date === dateStr && b.status !== 'cancelled');
 
                       return (
                         <motion.button key={dateStr} onClick={() => setEditingDate(isEditing ? null : dateStr)} whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }} style={{
@@ -474,7 +347,11 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
                           borderRadius: '6px', cursor: 'pointer', transition: 'all 0.2s', opacity: inMonth ? 1 : 0.3, gap: '2px',
                         }}>
                           <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '18px', color: hasSlots ? '#C9A84C' : '#FAF6EF', lineHeight: 1, opacity: hasSlots ? 1 : inMonth ? 0.6 : 0.2 }}>{format(date, 'd')}</span>
-                          {hasSlots && <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '8px', color: '#E8C97A', opacity: 0.8 }}>{freeSlots}/{slots.length}</span>}
+                          {hasSlots && (
+                            <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '8px', color: '#E8C97A', opacity: 0.8 }}>
+                              {freeSlots}/{slots.length}
+                            </span>
+                          )}
                           {dayBookings.length > 0 && (
                             <div style={{ display: 'flex', gap: '2px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '2px' }}>
                               {dayBookings.slice(0, 3).map(b => (
@@ -490,7 +367,7 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
                 </>
               )}
 
-              {/* WEEK VIEW */}
+              {/* ── WEEK VIEW ── */}
               {calView === 'week' && (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
@@ -541,98 +418,41 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
                       </div>
                       <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                         <button onClick={() => toggleAllSlots(editingDate)} style={{ padding: '6px 14px', background: 'transparent', border: '1px solid rgba(201,168,76,0.3)', color: '#C9A84C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer' }}>
-                          {getSlotsForDate(editingDate).length === ALL_SLOTS.length ? 'Tout fermer' : 'Tout ouvrir'}
+                          {getSlotsForDate(editingDate).length === ALL_SLOTS.length ? 'Tout désactiver' : 'Tout activer'}
                         </button>
                         <button onClick={() => setEditingDate(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
                           <X size={16} color="#8A7968" />
                         </button>
                       </div>
                     </div>
-
-                    {/* ALL possible slots grid */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
                       {ALL_SLOTS.map((slot) => {
-                        const isOpen = getSlotsForDate(editingDate).includes(slot);
+                        const isActive = getSlotsForDate(editingDate).includes(slot);
                         const isBooked = getBookedSlotsForDate(editingDate).includes(slot);
-                        const bookingForSlot = bookings.find(b => b.date === editingDate && b.time === slot && !['cancelled','expired'].includes(b.status));
-
+                        const bookingForSlot = bookings.find(b => b.date === editingDate && b.time === slot && b.status !== 'cancelled');
                         return (
                           <div key={slot} style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
-                            {/* Slot toggle button */}
-                            <motion.button
-                              onClick={() => !isBooked && toggleSlot(editingDate, slot)}
-                              whileHover={!isBooked ? { scale: 1.08 } : {}}
-                              whileTap={!isBooked ? { scale: 0.95 } : {}}
-                              disabled={isBooked}
-                              style={{
-                                padding: '10px 18px',
-                                background: isBooked ? 'rgba(231,76,60,0.12)' : isOpen ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'rgba(255,255,255,0.03)',
-                                border: isBooked ? '1px solid rgba(231,76,60,0.4)' : isOpen ? '1px solid #C9A84C' : '1px solid rgba(255,255,255,0.08)',
-                                borderRadius: '4px',
-                                fontFamily: 'Jost, sans-serif', fontSize: '13px',
-                                color: isBooked ? '#E74C3C' : isOpen ? '#0A0A0A' : '#8A7968',
-                                cursor: isBooked ? 'default' : 'pointer',
-                                transition: 'all 0.2s', fontWeight: isOpen ? 600 : 400,
-                                minWidth: '80px',
-                              }}
-                            >
+                            <motion.button onClick={() => !isBooked && toggleSlot(editingDate, slot)} whileHover={!isBooked ? { scale: 1.08 } : {}} whileTap={!isBooked ? { scale: 0.95 } : {}} disabled={isBooked} style={{ padding: '10px 18px', background: isBooked ? 'rgba(231,76,60,0.1)' : isActive ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'rgba(255,255,255,0.03)', border: isBooked ? '1px solid rgba(231,76,60,0.35)' : isActive ? '1px solid #C9A84C' : '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '13px', color: isBooked ? '#E74C3C' : isActive ? '#0A0A0A' : '#8A7968', cursor: isBooked ? 'not-allowed' : 'pointer', transition: 'all 0.2s', fontWeight: isActive ? 600 : 400, opacity: isBooked ? 0.8 : 1 }}>
                               {slot}
-                              {isBooked && <span style={{ marginLeft: '5px', fontSize: '9px', opacity: 0.8 }}>· RDV</span>}
+                              {isBooked && <span style={{ marginLeft: '6px', fontSize: '9px', letterSpacing: '0.05em', textTransform: 'uppercase', opacity: 0.8 }}>réservé</span>}
                             </motion.button>
-
-                            {/* Actions for booked slots */}
+                            {/* Actions for booked slot */}
                             {isBooked && bookingForSlot && (
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', width: '100%' }}>
-                                <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '8px', color: '#8A7968', textAlign: 'center', maxWidth: '80px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {bookingForSlot.name}
-                                </div>
-                                <div style={{ display: 'flex', gap: '3px' }}>
-                                  <button
-                                    onClick={() => setReassignModal({ booking: bookingForSlot, currentDate: editingDate, currentTime: slot })}
-                                    title="Déplacer ce RDV"
-                                    style={{ flex: 1, padding: '3px 6px', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '2px', color: '#C9A84C', fontSize: '9px', cursor: 'pointer', fontFamily: 'Jost, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}
-                                  >
-                                    <RefreshCw size={9} /> Déplacer
-                                  </button>
-                                  <button
-                                    onClick={() => releaseSlot(bookingForSlot)}
-                                    title="Annuler et libérer"
-                                    style={{ flex: 1, padding: '3px 6px', background: 'rgba(231,76,60,0.08)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: '2px', color: '#E74C3C', fontSize: '9px', cursor: 'pointer', fontFamily: 'Jost, sans-serif', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}
-                                  >
-                                    <Ban size={9} /> Annuler
-                                  </button>
-                                </div>
+                              <div style={{ display: 'flex', gap: '4px' }}>
+                                <button onClick={() => releaseSlot(bookingForSlot)} title="Libérer ce créneau" style={{ padding: '3px 6px', background: 'rgba(231,76,60,0.1)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: '2px', color: '#E74C3C', fontSize: '9px', cursor: 'pointer', fontFamily: 'Jost, sans-serif' }}>
+                                  Libérer
+                                </button>
+                                <button onClick={() => setReassignModal({ booking: bookingForSlot, currentDate: editingDate, currentTime: slot })} title="Déplacer ce RDV" style={{ padding: '3px 6px', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '2px', color: '#C9A84C', fontSize: '9px', cursor: 'pointer', fontFamily: 'Jost, sans-serif' }}>
+                                  Déplacer
+                                </button>
                               </div>
-                            )}
-
-                            {/* Actions for open but unbooked slots: option to block */}
-                            {isOpen && !isBooked && (
-                              <button
-                                onClick={() => blockSlot(editingDate, slot)}
-                                title="Bloquer ce créneau"
-                                style={{ padding: '3px 8px', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '2px', color: '#555', fontSize: '9px', cursor: 'pointer', fontFamily: 'Jost, sans-serif', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}
-                              >
-                                <Ban size={9} /> Bloquer
-                              </button>
-                            )}
-
-                            {/* For closed slots: reopen button */}
-                            {!isOpen && !isBooked && (
-                              <button
-                                onClick={() => reopenSlot(editingDate, slot)}
-                                title="Ouvrir ce créneau"
-                                style={{ padding: '3px 8px', background: 'transparent', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '2px', color: '#8A7968', fontSize: '9px', cursor: 'pointer', fontFamily: 'Jost, sans-serif', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '3px' }}
-                              >
-                                <RotateCcw size={9} /> Rouvrir
-                              </button>
                             )}
                           </div>
                         );
                       })}
                     </div>
-
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', marginTop: '16px', opacity: 0.7 }}>
-                      Doré = ouvert · Gris = fermé · Rouge = réservé. "Déplacer" change le créneau d'un RDV existant. "Bloquer" ferme un créneau ouvert sans réservation.
+                      Les créneaux en rouge sont réservés. Utilisez "Libérer" pour annuler ou "Déplacer" pour changer l'heure du RDV.
                     </p>
                   </motion.div>
                 )}
@@ -644,7 +464,7 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
                   { color: 'rgba(201,168,76,0.12)', border: 'rgba(201,168,76,0.35)', label: 'Jour avec créneaux' },
                   { color: 'rgba(255,255,255,0.02)', border: 'rgba(255,255,255,0.05)', label: 'Jour fermé' },
                   { color: 'linear-gradient(135deg, #C9A84C, #E8C97A)', border: '#C9A84C', label: 'Créneau ouvert' },
-                  { color: 'rgba(231,76,60,0.12)', border: 'rgba(231,76,60,0.4)', label: 'Créneau réservé' },
+                  { color: 'rgba(231,76,60,0.1)', border: 'rgba(231,76,60,0.35)', label: 'Créneau réservé' },
                 ].map(({ color, border, label }) => (
                   <div key={label} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <div style={{ width: '16px', height: '16px', background: color, border: `1px solid ${border}`, borderRadius: '3px' }} />
@@ -656,7 +476,7 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
           </motion.div>
         )}
 
-        {/* ═════ PHOTOS ═════ */}
+        {/* ===== PHOTOS ===== */}
         {tab === 'photos' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div style={{ background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '4px', padding: '32px', marginBottom: '24px' }}>
@@ -724,133 +544,70 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
           </motion.div>
         )}
 
-        {/* ═════ RÉSERVATIONS ═════ */}
+        {/* ===== RÉSERVATIONS ===== */}
         {tab === 'reservations' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <div style={{ background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '4px', padding: '32px' }}>
               <h2 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '28px', color: '#FAF6EF', marginBottom: '8px' }}>Réservations</h2>
               <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', marginBottom: '28px' }}>
-                Temps réel. Les annulations approuvées libèrent automatiquement le créneau.
+                Les réservations apparaissent automatiquement en temps réel.
               </p>
-
-              {/* Cancellation_requested alert banner */}
-              {pendingCancels > 0 && (
-                <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '14px 20px', background: 'rgba(231,76,60,0.06)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: '4px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <AlertTriangle size={16} color="#E74C3C" />
-                  <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#E74C3C' }}>
-                    {pendingCancels} demande{pendingCancels > 1 ? 's' : ''} d'annulation en attente de traitement
-                  </span>
-                </motion.div>
-              )}
 
               {/* Status filter */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                {[null, 'pending_payment', 'waiting_confirmation', 'confirmed', 'cancellation_requested', 'cancelled', 'expired'].map(s => (
-                  <button
-                    key={s || 'all'}
-                    onClick={() => setStatusFilter(s)}
-                    style={{
-                      padding: '6px 14px',
-                      background: statusFilter === s ? (s ? `${STATUS_COLOR[s]}22` : 'rgba(201,168,76,0.12)') : 'transparent',
-                      border: statusFilter === s ? `1px solid ${s ? STATUS_COLOR[s] : '#C9A84C'}66` : '1px solid rgba(201,168,76,0.15)',
-                      color: statusFilter === s ? (s ? STATUS_COLOR[s] : '#C9A84C') : '#8A7968',
-                      borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px',
-                      letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', transition: 'all 0.2s',
-                    }}
-                  >
+                {[null, 'pending_payment', 'waiting_confirmation', 'confirmed', 'cancelled'].map(s => (
+                  <button key={s || 'all'} style={{ padding: '6px 14px', background: 'transparent', border: '1px solid rgba(201,168,76,0.2)', color: '#8A7968', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer' }}>
                     {s ? STATUS_LABEL[s] : 'Tous'}
-                    {s === 'waiting_confirmation' && pendingProofs > 0 && ` (${pendingProofs})`}
-                    {s === 'cancellation_requested' && pendingCancels > 0 && ` (${pendingCancels})`}
                   </button>
                 ))}
               </div>
 
-              {filteredBookings.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '60px', color: '#8A7968', fontFamily: 'Jost, sans-serif' }}>Aucune réservation.</div>
+              {bookings.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px', color: '#8A7968', fontFamily: 'Jost, sans-serif' }}>Aucune réservation pour le moment.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {filteredBookings.map((b) => {
-                    const isCancelReq = b.status === 'cancellation_requested';
-                    const isWaiting = b.status === 'waiting_confirmation';
-                    return (
-                      <motion.div key={b.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                        style={{
-                          padding: '20px 24px',
-                          background: isCancelReq ? 'rgba(231,76,60,0.04)' : isWaiting ? 'rgba(232,164,76,0.04)' : 'rgba(255,255,255,0.02)',
-                          border: isCancelReq ? '1px solid rgba(231,76,60,0.2)' : isWaiting ? '1px solid rgba(232,164,76,0.2)' : '1px solid rgba(201,168,76,0.08)',
-                          borderRadius: '4px', position: 'relative', overflow: 'hidden',
-                        }}
-                      >
-                        {isCancelReq && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #E74C3C, transparent)' }} />}
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '16px', alignItems: 'center' }}>
-                          <div>
-                            <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '20px', color: '#FAF6EF' }}>{b.name}</div>
-                            <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>{b.phone}</div>
-                            <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '9px', color: '#555', marginTop: '4px', wordBreak: 'break-all' }}>#{b.id?.slice(0, 8)}</div>
-                          </div>
-                          <div>
-                            <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#FAF6EF' }}>{b.service}</div>
-                            <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C' }}>{b.date} à {b.time}</div>
-                            {b.acompte && <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', marginTop: '2px' }}>Acompte: {b.acompte?.toLocaleString()} FCFA</div>}
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            <span style={{ padding: '4px 12px', background: `${STATUS_COLOR[b.status || 'pending_payment']}22`, border: `1px solid ${STATUS_COLOR[b.status || 'pending_payment']}44`, color: STATUS_COLOR[b.status || 'pending_payment'], borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', display: 'inline-block' }}>
-                              {STATUS_LABEL[b.status] || 'En attente'}
-                            </span>
-                            {b.proofUrl && (
-                              <button onClick={() => setProofViewer(b.proofUrl)} style={{ padding: '4px 12px', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)', color: '#C9A84C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.08em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', width: 'fit-content' }}>
-                                <Eye size={11} /> Voir preuve
-                              </button>
-                            )}
-                          </div>
-                          <div style={{ display: 'flex', gap: '8px', flexDirection: 'column', minWidth: '120px' }}>
-
-                            {/* Waiting confirmation → confirm or refuse */}
-                            {b.status === 'waiting_confirmation' && (
-                              <>
-                                <button onClick={() => updateBookingStatus(b.id, 'confirmed')} style={{ padding: '8px 14px', background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', color: '#25D366', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', letterSpacing: '0.08em', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <Check size={12} /> Confirmer
-                                </button>
-                                <button onClick={() => updateBookingStatus(b.id, 'cancelled')} style={{ padding: '8px 14px', background: 'rgba(231,76,60,0.1)', border: '1px solid rgba(231,76,60,0.3)', color: '#E74C3C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <X size={12} /> Refuser
-                                </button>
-                              </>
-                            )}
-
-                            {/* Cancellation requested → accept or reject */}
-                            {b.status === 'cancellation_requested' && (
-                              <>
-                                <button onClick={() => acceptCancellation(b)} style={{ padding: '8px 14px', background: 'rgba(231,76,60,0.12)', border: '1px solid rgba(231,76,60,0.4)', color: '#E74C3C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 600 }}>
-                                  ✓ Accepter annulation
-                                </button>
-                                <button onClick={() => rejectCancellation(b)} style={{ padding: '8px 14px', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)', color: '#C9A84C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer' }}>
-                                  ✕ Maintenir le RDV
-                                </button>
-                              </>
-                            )}
-
-                            {/* Confirmed → move or cancel */}
-                            {b.status === 'confirmed' && (
-                              <>
-                                <button onClick={() => setReassignModal({ booking: b, currentDate: b.date, currentTime: b.time })} style={{ padding: '8px 14px', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#C9A84C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                  <RefreshCw size={11} /> Déplacer
-                                </button>
-                                <button onClick={() => releaseSlot(b)} style={{ padding: '8px 14px', background: 'rgba(231,76,60,0.06)', border: '1px solid rgba(231,76,60,0.2)', color: '#E74C3C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', opacity: 0.8 }}>Annuler</button>
-                              </>
-                            )}
-
-                            {/* Pending payment → expire */}
-                            {b.status === 'pending_payment' && (
-                              <button onClick={() => expireBooking(b)} style={{ padding: '8px 14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', color: '#555', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer' }}>
-                                Marquer expiré
-                              </button>
-                            )}
-                          </div>
+                  {bookings.map((b) => (
+                    <motion.div key={b.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '20px 24px', background: b.status === 'waiting_confirmation' ? 'rgba(232,164,76,0.04)' : 'rgba(255,255,255,0.02)', border: b.status === 'waiting_confirmation' ? '1px solid rgba(232,164,76,0.25)' : '1px solid rgba(201,168,76,0.08)', borderRadius: '4px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '16px', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '20px', color: '#FAF6EF' }}>{b.name}</div>
+                          <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>{b.phone}</div>
                         </div>
-                      </motion.div>
-                    );
-                  })}
+                        <div>
+                          <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#FAF6EF' }}>{b.service}</div>
+                          <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C' }}>{b.date} à {b.time}</div>
+                          {b.acompte && <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', marginTop: '2px' }}>Acompte: {b.acompte?.toLocaleString()} FCFA</div>}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <span style={{ padding: '4px 12px', background: `${STATUS_COLOR[b.status || 'pending_payment']}22`, border: `1px solid ${STATUS_COLOR[b.status || 'pending_payment']}44`, color: STATUS_COLOR[b.status || 'pending_payment'], borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', display: 'inline-block' }}>
+                            {STATUS_LABEL[b.status] || 'En attente'}
+                          </span>
+                          {/* Proof button */}
+                          {b.proofUrl && (
+                            <button onClick={() => setProofViewer(b.proofUrl)} style={{ padding: '4px 12px', background: 'rgba(201,168,76,0.08)', border: '1px solid rgba(201,168,76,0.25)', color: '#C9A84C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.08em', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', width: 'fit-content' }}>
+                              <Eye size={11} /> Voir preuve
+                            </button>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexDirection: 'column' }}>
+                          {b.status === 'waiting_confirmation' && (
+                            <>
+                              <button onClick={() => updateBookingStatus(b.id, 'confirmed')} style={{ padding: '8px 14px', background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', color: '#25D366', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>✓ Confirmer</button>
+                              <button onClick={() => updateBookingStatus(b.id, 'cancelled')} style={{ padding: '8px 14px', background: 'rgba(231,76,60,0.1)', border: '1px solid rgba(231,76,60,0.3)', color: '#E74C3C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer' }}>✕ Refuser</button>
+                            </>
+                          )}
+                          {b.status === 'confirmed' && (
+                            <button onClick={() => setReassignModal({ booking: b, currentDate: b.date, currentTime: b.time })} style={{ padding: '8px 14px', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#C9A84C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              Déplacer
+                            </button>
+                          )}
+                          {['pending_payment', 'confirmed'].includes(b.status) && b.status !== 'cancelled' && (
+                            <button onClick={() => updateBookingStatus(b.id, 'cancelled')} style={{ padding: '8px 14px', background: 'rgba(231,76,60,0.06)', border: '1px solid rgba(231,76,60,0.2)', color: '#E74C3C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', opacity: 0.7 }}>Annuler</button>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               )}
             </div>
@@ -858,7 +615,7 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
         )}
       </div>
 
-      {/* Proof viewer modal */}
+      {/* ── Proof viewer modal ── */}
       <AnimatePresence>
         {proofViewer && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setProofViewer(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
@@ -873,7 +630,7 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
         )}
       </AnimatePresence>
 
-      {/* Reassign modal */}
+      {/* ── Reassign modal ── */}
       <AnimatePresence>
         {reassignModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setReassignModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
@@ -885,10 +642,7 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
 
               <div style={{ padding: '12px 16px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '4px', marginBottom: '20px' }}>
                 <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968', margin: 0 }}>
-                  RDV de <strong style={{ color: '#FAF6EF' }}>{reassignModal.booking.name}</strong> : {reassignModal.currentDate} à {reassignModal.currentTime}
-                </p>
-                <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', margin: '6px 0 0', opacity: 0.7 }}>
-                  L'ancien créneau sera automatiquement rouvert.
+                  RDV actuel de <strong style={{ color: '#FAF6EF' }}>{reassignModal.booking.name}</strong> : {reassignModal.currentDate} à {reassignModal.currentTime}
                 </p>
               </div>
 
@@ -930,12 +684,19 @@ Bonjour *${booking.name}*, votre demande d'annulation n'a pas pu être acceptée
       </AnimatePresence>
 
       <style>{`
-        @media (max-width: 768px) {
-          .admin-header { padding: 16px 20px !important; }
-          div[style*="grid-template-columns: 1fr 1fr 1fr auto"] { grid-template-columns: 1fr !important; }
-        }
+        @media (max-width: 768px) { .admin-header { padding: 16px 20px !important; } }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
       `}</style>
     </div>
   );
 }
+
+const labelStyle = {
+  fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.15em',
+  textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '8px',
+};
+const inputStyle = {
+  width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.03)',
+  border: '1px solid rgba(201,168,76,0.25)', borderRadius: '2px', color: '#FAF6EF',
+  fontFamily: 'Jost, sans-serif', fontSize: '14px', outline: 'none', boxSizing: 'border-box', transition: 'border 0.3s',
+};

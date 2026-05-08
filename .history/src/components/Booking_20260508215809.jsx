@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../firebase.js';
-import { collection, onSnapshot, query, where, addDoc, serverTimestamp, updateDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { format, addDays, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
   Sparkles, Camera, Crown, Clock, ChevronLeft, ChevronRight,
-  MessageCircle, CreditCard, Check, Wand2, Upload, AlertCircle,
-  CheckCircle2, XCircle, ChevronDown, ArrowRight, Images
+  MessageCircle, CreditCard, Check, Wand2, Upload, AlertCircle, CheckCircle2
 } from 'lucide-react';
 import { uploadImage } from '../utils/uploadImage';
 
 const WHATSAPP_NUMBER = '221776695790';
-const ACOMPTE_AMOUNT = 2000;
+const ACOMPTE_AMOUNT = 2000; // FCFA
 
 const SERVICES = [
   { id: 1, label: 'Maquillage Simple', price: '7 000 FCFA', description: 'Look naturel et soigné, idéal pour le quotidien', Icon: Wand2 },
@@ -29,198 +28,6 @@ const STEPS = [
   { n: 5, label: 'Paiement' },
 ];
 
-// ─── Gallery Swipe Component ────────────────────────────────────────────────
-export function GallerySwipeHint({ photos = [] }) {
-  const scrollRef = useRef(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeftState] = useState(0);
-  const [hasInteracted, setHasInteracted] = useState(false);
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  const checkScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 10);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
-    const idx = Math.round(el.scrollLeft / (el.clientWidth * 0.75));
-    setCurrentIndex(Math.max(0, Math.min(idx, photos.length - 1)));
-  };
-
-  const scrollTo = (dir) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setHasInteracted(true);
-    el.scrollBy({ left: dir * el.clientWidth * 0.75, behavior: 'smooth' });
-  };
-
-  const onMouseDown = (e) => {
-    setIsDragging(true);
-    setStartX(e.pageX - scrollRef.current.offsetLeft);
-    setScrollLeftState(scrollRef.current.scrollLeft);
-  };
-  const onMouseMove = (e) => {
-    if (!isDragging) return;
-    e.preventDefault();
-    setHasInteracted(true);
-    const x = e.pageX - scrollRef.current.offsetLeft;
-    scrollRef.current.scrollLeft = scrollLeft - (x - startX) * 1.2;
-  };
-  const onMouseUp = () => setIsDragging(false);
-
-  return (
-    <div style={{ position: 'relative', overflow: 'hidden' }}>
-      {/* Clear swipe instruction banner */}
-      <AnimatePresence>
-        {!hasInteracted && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: '10px', marginBottom: '16px',
-              padding: '10px 20px',
-              background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.08), transparent)',
-              border: '1px solid rgba(201,168,76,0.15)', borderRadius: '40px',
-              margin: '0 auto 20px',
-              width: 'fit-content',
-            }}
-          >
-            {/* Animated finger/swipe icon */}
-            <motion.div
-              animate={{ x: [0, 18, 0] }}
-              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            >
-              <span style={{ fontSize: '18px' }}>👆</span>
-              <ArrowRight size={14} color="#C9A84C" />
-            </motion.div>
-            <span style={{
-              fontFamily: 'Jost, sans-serif', fontSize: '11px',
-              letterSpacing: '0.2em', textTransform: 'uppercase', color: '#C9A84C',
-            }}>
-              Faites défiler pour découvrir mes looks
-            </span>
-            <motion.div
-              animate={{ x: [0, -18, 0] }}
-              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
-            >
-              <Images size={14} color="#C9A84C" style={{ opacity: 0.6 }} />
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Arrow nav buttons (desktop) */}
-      <AnimatePresence>
-        {canScrollLeft && (
-          <motion.button
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            onClick={() => scrollTo(-1)}
-            style={{
-              position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)',
-              zIndex: 10, width: '44px', height: '44px', borderRadius: '50%',
-              background: 'rgba(10,10,10,0.85)', border: '1px solid rgba(201,168,76,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', backdropFilter: 'blur(8px)',
-            }}
-          >
-            <ChevronLeft size={20} color="#C9A84C" />
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {canScrollRight && (
-          <motion.button
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            onClick={() => scrollTo(1)}
-            style={{
-              position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-              zIndex: 10, width: '44px', height: '44px', borderRadius: '50%',
-              background: 'rgba(10,10,10,0.85)', border: '1px solid rgba(201,168,76,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', backdropFilter: 'blur(8px)',
-            }}
-          >
-            <ChevronRight size={20} color="#C9A84C" />
-          </motion.button>
-        )}
-      </AnimatePresence>
-
-      {/* Scrollable strip */}
-      <div
-        ref={scrollRef}
-        onScroll={checkScroll}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
-        style={{
-          display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '12px',
-          scrollSnapType: 'x mandatory', cursor: isDragging ? 'grabbing' : 'grab',
-          userSelect: 'none', WebkitOverflowScrolling: 'touch',
-          scrollbarWidth: 'none', msOverflowStyle: 'none',
-          padding: '0 8px 12px',
-        }}
-      >
-        <style>{`div::-webkit-scrollbar { display: none; }`}</style>
-        {photos.map((photo, i) => (
-          <motion.div
-            key={photo.id || i}
-            style={{
-              flexShrink: 0, width: 'clamp(220px, 70vw, 320px)',
-              scrollSnapAlign: 'start', borderRadius: '8px', overflow: 'hidden',
-              border: '1px solid rgba(201,168,76,0.15)',
-              position: 'relative',
-            }}
-          >
-            <img
-              src={photo.url}
-              alt={photo.title}
-              draggable={false}
-              style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block', pointerEvents: 'none' }}
-            />
-            <div style={{
-              position: 'absolute', bottom: 0, left: 0, right: 0,
-              padding: '32px 16px 16px',
-              background: 'linear-gradient(to top, rgba(10,10,10,0.85) 0%, transparent 100%)',
-            }}>
-              <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '16px', color: '#FAF6EF' }}>{photo.title}</div>
-              <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '9px', color: '#C9A84C', letterSpacing: '0.2em', textTransform: 'uppercase', marginTop: '4px' }}>{photo.category}</div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Dot indicators */}
-      {photos.length > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '12px' }}>
-          {photos.map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: i === currentIndex ? '20px' : '6px', height: '6px',
-                borderRadius: '3px',
-                background: i === currentIndex ? '#C9A84C' : 'rgba(201,168,76,0.25)',
-                transition: 'all 0.3s ease',
-              }}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Booking Component ───────────────────────────────────────────────────────
 export default function Booking() {
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState(null);
@@ -239,12 +46,6 @@ export default function Booking() {
   const [uploading, setUploading] = useState(false);
   const [paymentSent, setPaymentSent] = useState(false);
   const [creatingBooking, setCreatingBooking] = useState(false);
-
-  // Cancellation state
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [cancelBookingId, setCancelBookingId] = useState('');
-  const [cancelStatus, setCancelStatus] = useState(null); // null | 'loading' | 'success' | 'error' | 'not_found'
-  const [foundBooking, setFoundBooking] = useState(null);
 
   const proofRef = useRef();
 
@@ -270,7 +71,7 @@ export default function Booking() {
     const unsub = onSnapshot(q, (snap) => {
       setBookedSlots(
         snap.docs
-          .filter(d => !['cancelled', 'expired'].includes(d.data().status))
+          .filter(d => !['cancelled'].includes(d.data().status))
           .map(d => d.data().time)
       );
     }, () => {});
@@ -298,6 +99,7 @@ export default function Booking() {
     setProofPreview(URL.createObjectURL(file));
   };
 
+  // Step 4 → 5: create booking in Firestore with status pending_payment
   const handleCreateBooking = async () => {
     if (creatingBooking) return;
     setCreatingBooking(true);
@@ -326,6 +128,7 @@ export default function Booking() {
     }
   };
 
+  // Upload proof + update booking to waiting_confirmation
   const handleSendProof = async () => {
     if (!proofFile || !bookingId || uploading) return;
     setUploading(true);
@@ -338,6 +141,7 @@ export default function Booking() {
         proofSentAt: serverTimestamp(),
       });
 
+      // Also send WhatsApp message to notify admin
       const service = SERVICES.find(s => s.id === selectedService);
       const dateStr = format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr });
       const msg =
@@ -357,72 +161,6 @@ Merci de valider dans le dashboard.`;
       alert('Erreur lors de l\'envoi. Veuillez réessayer.');
     } finally {
       setUploading(false);
-    }
-  };
-
-  // ── Cancellation lookup ──────────────────────────────────────────────────
-  const handleCancelLookup = async () => {
-    if (!cancelBookingId.trim()) return;
-    setCancelStatus('loading');
-    setFoundBooking(null);
-    try {
-      const { getDoc, doc } = await import('firebase/firestore');
-      const snap = await getDoc(doc(db, 'bookings', cancelBookingId.trim()));
-      if (!snap.exists()) {
-        setCancelStatus('not_found');
-        return;
-      }
-      setFoundBooking({ id: snap.id, ...snap.data() });
-      setCancelStatus('found');
-    } catch {
-      setCancelStatus('error');
-    }
-  };
-
-  const handleConfirmCancel = async () => {
-    if (!foundBooking) return;
-    setCancelStatus('loading');
-    try {
-      const isFreeCancel = ['pending_payment', 'waiting_confirmation'].includes(foundBooking.status);
-      const newStatus = isFreeCancel ? 'cancelled' : 'cancellation_requested';
-
-      await updateDoc(doc(db, 'bookings', foundBooking.id), {
-        status: newStatus,
-        cancelRequestedAt: serverTimestamp(),
-      });
-
-      // If free cancel → also free the slot in availability (reopen it)
-      if (isFreeCancel && foundBooking.date && foundBooking.time) {
-        const { getDoc, setDoc, doc: fsDoc } = await import('firebase/firestore');
-        const availSnap = await getDoc(fsDoc(db, 'availability', foundBooking.date));
-        if (availSnap.exists()) {
-          const slots = availSnap.data().slots || [];
-          if (!slots.includes(foundBooking.time)) {
-            await setDoc(fsDoc(db, 'availability', foundBooking.date), {
-              slots: [...slots, foundBooking.time].sort(),
-              updatedAt: serverTimestamp(),
-            }, { merge: true });
-          }
-        }
-      }
-
-      // Notify admin via WhatsApp if cancellation_requested
-      if (!isFreeCancel) {
-        const msg =
-`❌ *MAGICAL HAND — Demande d'annulation*
-━━━━━━━━━━━━━━━━━━━
-👤 ${foundBooking.name}${foundBooking.phone ? `\n📱 ${foundBooking.phone}` : ''}
-💋 ${foundBooking.service}
-📅 ${foundBooking.date} à ${foundBooking.time}
-━━━━━━━━━━━━━━━━━━━
-Le client demande l'annulation de son RDV confirmé.
-Merci de traiter la demande dans le dashboard.`;
-        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
-      }
-
-      setCancelStatus(isFreeCancel ? 'cancelled_free' : 'cancel_requested');
-    } catch {
-      setCancelStatus('error');
     }
   };
 
@@ -501,7 +239,7 @@ Merci de traiter la demande dans le dashboard.`;
           }}
         >
 
-          {/* ── STEP 1 ── */}
+          {/* ── STEP 1 : Prestation ── */}
           {step === 1 && (
             <div>
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(22px, 4vw, 28px)', color: '#FAF6EF', marginBottom: '24px' }}>
@@ -541,7 +279,7 @@ Merci de traiter la demande dans le dashboard.`;
             </div>
           )}
 
-          {/* ── STEP 2 ── */}
+          {/* ── STEP 2 : Date & Heure ── */}
           {step === 2 && (
             <div>
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(22px, 4vw, 28px)', color: '#FAF6EF', marginBottom: '6px' }}>
@@ -617,7 +355,7 @@ Merci de traiter la demande dans le dashboard.`;
             </div>
           )}
 
-          {/* ── STEP 3 ── */}
+          {/* ── STEP 3 : Infos ── */}
           {step === 3 && (
             <div>
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(22px, 4vw, 28px)', color: '#FAF6EF', marginBottom: '28px' }}>Vos informations</h3>
@@ -638,7 +376,7 @@ Merci de traiter la demande dans le dashboard.`;
             </div>
           )}
 
-          {/* ── STEP 4 ── */}
+          {/* ── STEP 4 : Récapitulatif ── */}
           {step === 4 && (
             <div>
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(22px, 4vw, 28px)', color: '#FAF6EF', marginBottom: '28px' }}>Récapitulatif</h3>
@@ -657,6 +395,7 @@ Merci de traiter la demande dans le dashboard.`;
                 </div>
               ))}
 
+              {/* Acompte info */}
               <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '4px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                 <CreditCard size={18} color="#C9A84C" style={{ marginTop: '2px', flexShrink: 0 }} />
                 <div>
@@ -687,7 +426,7 @@ Merci de traiter la demande dans le dashboard.`;
             </div>
           )}
 
-          {/* ── STEP 5 ── */}
+          {/* ── STEP 5 : Paiement acompte ── */}
           {step === 5 && (
             <div>
               {!paymentSent ? (
@@ -702,8 +441,10 @@ Merci de traiter la demande dans le dashboard.`;
                     </div>
                   </div>
 
+                  {/* Instruction box */}
                   <div style={{ padding: '20px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '6px', marginBottom: '24px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '16px' }}>Instructions de paiement</p>
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {[
                         { step: '1', text: `Envoyez ${ACOMPTE_AMOUNT.toLocaleString()} FCFA via Wave ou Orange Money` },
@@ -717,6 +458,7 @@ Merci de traiter la demande dans le dashboard.`;
                         </div>
                       ))}
                     </div>
+
                     <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '4px', display: 'flex', gap: '10px', alignItems: 'center' }}>
                       <AlertCircle size={15} color="#C9A84C" style={{ flexShrink: 0 }} />
                       <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', margin: 0 }}>
@@ -725,17 +467,12 @@ Merci de traiter la demande dans le dashboard.`;
                     </div>
                   </div>
 
-                  {/* ID de réservation affiché — utile pour annulation */}
-                  <div style={{ marginBottom: '20px', padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '4px' }}>
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', letterSpacing: '0.15em', textTransform: 'uppercase', margin: '0 0 4px' }}>Votre numéro de réservation</p>
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#C9A84C', margin: 0, wordBreak: 'break-all' }}>{bookingId}</p>
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', margin: '6px 0 0', opacity: 0.7 }}>Conservez ce numéro pour modifier ou annuler votre réservation.</p>
-                  </div>
-
+                  {/* Upload proof */}
                   <div style={{ marginBottom: '20px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '12px' }}>
                       Preuve de paiement *
                     </p>
+
                     <div
                       onClick={() => proofRef.current?.click()}
                       style={{
@@ -787,6 +524,7 @@ Merci de traiter la demande dans le dashboard.`;
                   </motion.button>
                 </>
               ) : (
+                /* ── Payment sent confirmation ── */
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={{ textAlign: 'center', padding: '20px 0' }}>
                   <div style={{ width: '70px', height: '70px', borderRadius: '50%', background: 'linear-gradient(135deg, rgba(37,211,102,0.2), rgba(18,140,126,0.1))', border: '1px solid rgba(37,211,102,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
                     <CheckCircle2 size={32} color="#25D366" />
@@ -795,15 +533,10 @@ Merci de traiter la demande dans le dashboard.`;
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '14px', color: '#8A7968', maxWidth: '360px', margin: '0 auto 24px', lineHeight: 1.7 }}>
                     Votre réservation est en attente de validation. Mamifa vous confirmera votre rendez-vous par WhatsApp après vérification du paiement.
                   </p>
-                  <div style={{ padding: '16px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: '4px', marginBottom: '20px' }}>
+                  <div style={{ padding: '16px', background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)', borderRadius: '4px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#25D366', margin: 0, letterSpacing: '0.05em' }}>
                       ✓ Créneau bloqué · ✓ Preuve reçue · ⏳ Validation en cours
                     </p>
-                  </div>
-                  {/* Remind booking ID */}
-                  <div style={{ padding: '12px 16px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '4px', textAlign: 'left' }}>
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 4px' }}>N° de réservation — conservez-le</p>
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', margin: 0, wordBreak: 'break-all' }}>{bookingId}</p>
                   </div>
                 </motion.div>
               )}
@@ -827,153 +560,7 @@ Merci de traiter la demande dans le dashboard.`;
             </div>
           )}
         </motion.div>
-
-        {/* ── Cancel / Modify section ─────────────────────────────────────── */}
-        <div style={{ marginTop: '32px', textAlign: 'center' }}>
-          <button
-            onClick={() => { setShowCancelModal(true); setCancelStatus(null); setFoundBooking(null); setCancelBookingId(''); }}
-            style={{ background: 'transparent', border: 'none', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(138,121,104,0.3)', opacity: 0.7 }}
-          >
-            Modifier ou annuler une réservation existante
-          </button>
-        </div>
       </div>
-
-      {/* ── Cancel Modal ─────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {showCancelModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowCancelModal(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}
-          >
-            <motion.div
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9 }}
-              onClick={e => e.stopPropagation()}
-              style={{ width: '100%', maxWidth: '440px', background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '8px', padding: '32px' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', margin: 0 }}>Annuler / Modifier</h3>
-                <button onClick={() => setShowCancelModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
-              </div>
-
-              {/* Step: enter ID */}
-              {(cancelStatus === null || cancelStatus === 'not_found' || cancelStatus === 'error') && (
-                <>
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', marginBottom: '20px', lineHeight: 1.6 }}>
-                    Entrez votre numéro de réservation (reçu lors de votre réservation).
-                  </p>
-                  <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '8px' }}>Numéro de réservation</label>
-                  <input
-                    value={cancelBookingId}
-                    onChange={e => setCancelBookingId(e.target.value)}
-                    placeholder="Ex: ABC123xyz..."
-                    style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '2px', color: '#FAF6EF', fontFamily: 'Jost, sans-serif', fontSize: '14px', outline: 'none', boxSizing: 'border-box', marginBottom: '16px' }}
-                    onFocus={e => e.target.style.borderColor = '#C9A84C'}
-                    onBlur={e => e.target.style.borderColor = 'rgba(201,168,76,0.25)'}
-                    onKeyDown={e => e.key === 'Enter' && handleCancelLookup()}
-                  />
-                  {cancelStatus === 'not_found' && (
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E74C3C', marginBottom: '12px' }}>❌ Réservation introuvable. Vérifiez le numéro.</p>
-                  )}
-                  {cancelStatus === 'error' && (
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E74C3C', marginBottom: '12px' }}>Erreur de connexion. Veuillez réessayer.</p>
-                  )}
-                  <motion.button
-                    onClick={handleCancelLookup}
-                    disabled={!cancelBookingId.trim()}
-                    whileHover={cancelBookingId.trim() ? { scale: 1.03 } : {}}
-                    style={{ width: '100%', padding: '14px', background: cancelBookingId.trim() ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'rgba(255,255,255,0.05)', color: cancelBookingId.trim() ? '#0A0A0A' : '#8A7968', border: 'none', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: cancelBookingId.trim() ? 'pointer' : 'not-allowed' }}
-                  >
-                    Rechercher
-                  </motion.button>
-                </>
-              )}
-
-              {/* Loading */}
-              {cancelStatus === 'loading' && (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: '32px', height: '32px', border: '2px solid rgba(201,168,76,0.2)', borderTopColor: '#C9A84C', borderRadius: '50%', margin: '0 auto 12px' }} />
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968' }}>Recherche en cours...</p>
-                </div>
-              )}
-
-              {/* Found booking */}
-              {cancelStatus === 'found' && foundBooking && (
-                <>
-                  <div style={{ padding: '16px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '4px', marginBottom: '20px' }}>
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '12px' }}>Réservation trouvée</p>
-                    {[
-                      { l: 'Nom', v: foundBooking.name },
-                      { l: 'Prestation', v: foundBooking.service },
-                      { l: 'Date', v: `${foundBooking.date} à ${foundBooking.time}` },
-                      { l: 'Statut', v: { pending_payment: 'En attente paiement', waiting_confirmation: 'Preuve envoyée', confirmed: 'Confirmé', cancelled: 'Annulé', cancellation_requested: 'Annulation demandée', expired: 'Expiré' }[foundBooking.status] || foundBooking.status },
-                    ].map(({ l, v }) => (
-                      <div key={l} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', padding: '6px 0', borderBottom: '1px solid rgba(201,168,76,0.06)' }}>
-                        <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{l}</span>
-                        <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#FAF6EF', textAlign: 'right' }}>{v}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Already cancelled / expired */}
-                  {['cancelled', 'expired', 'cancellation_requested'].includes(foundBooking.status) ? (
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', textAlign: 'center', padding: '12px' }}>
-                      {foundBooking.status === 'cancellation_requested'
-                        ? '⏳ Votre demande d\'annulation est en cours de traitement.'
-                        : 'Cette réservation est déjà annulée ou expirée.'}
-                    </p>
-                  ) : (
-                    <>
-                      {/* Cancellation policy info */}
-                      <div style={{ padding: '12px', background: ['pending_payment', 'waiting_confirmation'].includes(foundBooking.status) ? 'rgba(37,211,102,0.05)' : 'rgba(232,164,76,0.05)', border: `1px solid ${['pending_payment', 'waiting_confirmation'].includes(foundBooking.status) ? 'rgba(37,211,102,0.2)' : 'rgba(232,164,76,0.2)'}`, borderRadius: '4px', marginBottom: '16px' }}>
-                        <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: ['pending_payment', 'waiting_confirmation'].includes(foundBooking.status) ? '#25D366' : '#E8A44C', margin: 0, lineHeight: 1.6 }}>
-                          {['pending_payment', 'waiting_confirmation'].includes(foundBooking.status)
-                            ? '✓ Annulation libre — votre créneau sera immédiatement libéré.'
-                            : '⚠️ RDV confirmé — une demande d\'annulation sera envoyée à Mamifa pour traitement.'}
-                        </p>
-                      </div>
-                      <div style={{ display: 'flex', gap: '10px' }}>
-                        <button onClick={() => { setCancelStatus(null); setFoundBooking(null); setCancelBookingId(''); }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid rgba(201,168,76,0.2)', color: '#8A7968', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer' }}>
-                          Retour
-                        </button>
-                        <motion.button onClick={handleConfirmCancel} whileHover={{ scale: 1.03 }} style={{ flex: 2, padding: '12px', background: 'rgba(231,76,60,0.15)', border: '1px solid rgba(231,76,60,0.4)', color: '#E74C3C', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, cursor: 'pointer' }}>
-                          <XCircle size={14} style={{ marginRight: '6px', display: 'inline' }} />
-                          {['pending_payment', 'waiting_confirmation'].includes(foundBooking.status) ? 'Confirmer l\'annulation' : 'Demander l\'annulation'}
-                        </motion.button>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-
-              {/* Success states */}
-              {cancelStatus === 'cancelled_free' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '10px 0' }}>
-                  <CheckCircle2 size={40} color="#25D366" style={{ marginBottom: '16px' }} />
-                  <h4 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', marginBottom: '10px' }}>Réservation annulée</h4>
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.6 }}>
-                    Votre réservation a été annulée et le créneau a été libéré.
-                  </p>
-                </motion.div>
-              )}
-              {cancelStatus === 'cancel_requested' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '10px 0' }}>
-                  <CheckCircle2 size={40} color="#E8A44C" style={{ marginBottom: '16px' }} />
-                  <h4 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', marginBottom: '10px' }}>Demande envoyée</h4>
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.6 }}>
-                    Votre demande d'annulation a été transmise à Mamifa via WhatsApp. Vous serez contacté pour confirmer.
-                  </p>
-                </motion.div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <style>{`
         @media (max-width: 768px) { #reserver { padding: 60px 16px !important; } }
