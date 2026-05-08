@@ -16,6 +16,7 @@ import { ChevronLeft, ChevronRight, Clock, X } from 'lucide-react';
 
 const CATEGORIES = ['Glam', 'Cérémonie', 'Naturel'];
 const ALL_SLOTS = ['08:00', '09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00','19:00', '20:00','21:00'];
+
 const TAB_STYLE = (active) => ({
   padding: '12px 24px',
   background: active ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'transparent',
@@ -50,7 +51,6 @@ export default function Admin() {
 
   const next28Days = Array.from({ length: 28 }, (_, i) => addDays(new Date(), i + 1));
   const visibleWeek = Array.from({ length: 7 }, (_, i) => addDays(new Date(), calOffset * 7 + i + 1));
-const [editingPhoto, setEditingPhoto] = useState(null); // { id, title, category }
 
   // Firestore listeners
   useEffect(() => {
@@ -123,22 +123,7 @@ const [editingPhoto, setEditingPhoto] = useState(null); // { id, title, category
     toast.error('Erreur suppression');
   }
 };
-const handleUpdatePhoto = async () => {
-  if (!editingPhoto?.title?.trim()) {
-    toast.error("Le titre ne peut pas être vide");
-    return;
-  }
-  try {
-    await updateDoc(doc(db, 'photos', editingPhoto.id), {
-      title: editingPhoto.title.trim(),
-      category: editingPhoto.category,
-    });
-    toast.success("Photo mise à jour !");
-    setEditingPhoto(null);
-  } catch {
-    toast.error("Erreur mise à jour");
-  }
-};
+
   // ---- AVAILABILITY ----
   // Get slots configured for a date
   const getSlotsForDate = (dateStr) => availability[dateStr]?.slots || [];
@@ -730,142 +715,60 @@ const handleUpdatePhoto = async () => {
             {/* Photos grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '16px' }}>
               <AnimatePresence>
-               {photos.map((photo) => (
-  <motion.div
-    key={photo.id}
-    initial={{ opacity: 0, scale: 0.9 }}
-    animate={{ opacity: 1, scale: 1 }}
-    exit={{ opacity: 0, scale: 0.9 }}
-    style={{
-      background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)',
-      border: editingPhoto?.id === photo.id
-        ? '1px solid rgba(201,168,76,0.5)'
-        : '1px solid rgba(201,168,76,0.1)',
-      borderRadius: '4px',
-      overflow: 'hidden',
-      transition: 'border 0.2s',
-    }}
-  >
-    <div style={{ position: 'relative', aspectRatio: '3/4' }}>
-      <img
-        src={photo.url}
-        alt={photo.title}
-        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-      />
-      {/* Boutons action */}
-      <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '6px' }}>
-        <button
-          onClick={() => setEditingPhoto(
-            editingPhoto?.id === photo.id
-              ? null
-              : { id: photo.id, title: photo.title, category: photo.category }
-          )}
-          style={{
-            background: editingPhoto?.id === photo.id
-              ? 'rgba(201,168,76,0.85)'
-              : 'rgba(20,20,20,0.75)',
-            color: editingPhoto?.id === photo.id ? '#0A0A0A' : '#C9A84C',
-            border: '1px solid rgba(201,168,76,0.4)',
-            borderRadius: '50%',
-            width: '30px', height: '30px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          title="Modifier"
-        >✎</button>
-        <button
-          onClick={() => handleDeletePhoto(photo)}
-          style={{
-            background: 'rgba(231,76,60,0.85)',
-            color: '#FFF',
-            border: 'none',
-            borderRadius: '50%',
-            width: '30px', height: '30px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}
-          title="Supprimer"
-        >×</button>
-      </div>
-    </div>
-
-    {/* Infos ou formulaire d'édition */}
-    <div style={{ padding: '14px' }}>
-      {editingPhoto?.id === photo.id ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <input
-            type="text"
-            value={editingPhoto.title}
-            onChange={e => setEditingPhoto({ ...editingPhoto, title: e.target.value })}
-            style={{ ...inputStyle, fontSize: '13px', padding: '8px 12px' }}
-            onFocus={e => e.target.style.borderColor = '#C9A84C'}
-            onBlur={e => e.target.style.borderColor = 'rgba(201,168,76,0.25)'}
-            placeholder="Titre"
-            autoFocus
-          />
-          <select
-            value={editingPhoto.category}
-            onChange={e => setEditingPhoto({ ...editingPhoto, category: e.target.value })}
-            style={{ ...inputStyle, fontSize: '13px', padding: '8px 12px', cursor: 'pointer' }}
-          >
-            {CATEGORIES.map(c => (
-              <option key={c} value={c} style={{ background: '#1A1714' }}>{c}</option>
-            ))}
-          </select>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={handleUpdatePhoto}
-              style={{
-                flex: 1,
-                padding: '8px',
-                background: 'linear-gradient(135deg, #C9A84C, #E8C97A)',
-                color: '#0A0A0A',
-                border: 'none',
-                borderRadius: '2px',
-                fontFamily: 'Jost, sans-serif',
-                fontSize: '10px',
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                fontWeight: 600,
-                cursor: 'pointer',
-              }}
-            >Enregistrer</button>
-            <button
-              onClick={() => setEditingPhoto(null)}
-              style={{
-                padding: '8px 12px',
-                background: 'transparent',
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#8A7968',
-                borderRadius: '2px',
-                fontFamily: 'Jost, sans-serif',
-                fontSize: '10px',
-                cursor: 'pointer',
-              }}
-            >Annuler</button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '16px', color: '#FAF6EF' }}>
-            {photo.title}
-          </div>
-          <div style={{
-            fontFamily: 'Jost, sans-serif',
-            fontSize: '10px',
-            color: '#C9A84C',
-            letterSpacing: '0.15em',
-            textTransform: 'uppercase',
-            marginTop: '4px',
-          }}>{photo.category}</div>
-        </>
-      )}
-    </div>
-  </motion.div>
-))}
-                 
+                {photos.map((photo) => (
+                  <motion.div
+                    key={photo.id}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    style={{
+                      background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)',
+                      border: '1px solid rgba(201,168,76,0.1)',
+                      borderRadius: '4px',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div style={{ position: 'relative', aspectRatio: '3/4' }}>
+                      <img
+                        src={photo.url}
+                        alt={photo.title}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <button
+                        onClick={() => handleDeletePhoto(photo)}
+                        style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          background: 'rgba(231,76,60,0.85)',
+                          color: '#FFF',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '30px',
+                          height: '30px',
+                          cursor: 'pointer',
+                          fontSize: '14px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >×</button>
+                    </div>
+                    <div style={{ padding: '14px' }}>
+                      <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '16px', color: '#FAF6EF' }}>
+                        {photo.title}
+                      </div>
+                      <div style={{
+                        fontFamily: 'Jost, sans-serif',
+                        fontSize: '10px',
+                        color: '#C9A84C',
+                        letterSpacing: '0.15em',
+                        textTransform: 'uppercase',
+                        marginTop: '4px',
+                      }}>{photo.category}</div>
+                    </div>
+                  </motion.div>
+                ))}
               </AnimatePresence>
             </div>
 

@@ -50,7 +50,6 @@ export default function Admin() {
 
   const next28Days = Array.from({ length: 28 }, (_, i) => addDays(new Date(), i + 1));
   const visibleWeek = Array.from({ length: 7 }, (_, i) => addDays(new Date(), calOffset * 7 + i + 1));
-const [editingPhoto, setEditingPhoto] = useState(null); // { id, title, category }
 
   // Firestore listeners
   useEffect(() => {

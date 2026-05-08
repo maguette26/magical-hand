@@ -597,8 +597,8 @@ _Magical Hand by Mamifa_`;
               }}>Vos informations</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {[
-                  { label: 'Votre prénom *', value: name, setter: setName, placeholder: 'Ex: Aïssatou', type: 'text' ,required: true },
-                  { label: 'Votre numéro de téléphone', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel' ,required:true},
+                  { label: 'Votre prénom *', value: name, setter: setName, placeholder: 'Ex: Aïssatou', type: 'text' required },
+                  { label: 'Votre téléphone (optionnel)', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel' },
                 ].map((field) => (
                   <div key={field.label}>
                     <label style={{

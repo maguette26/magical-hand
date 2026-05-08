@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 1,
+            "activePatchIndex": 2,
             "patches": [
                 {
                     "date": 1778118701677,
@@ -12,6 +12,10 @@
                 {
                     "date": 1778118737869,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -41,9 +41,9 @@\n           color: \"#FAF6EF\",\n           marginBottom: \"10px\",\n         }}\n       >\n-        📞 +221 77 669 57 90\n+        📞T +221 77 669 57 90\n       </p>\n \n       {/* Paiement */}\n       <p\n"
+                },
+                {
+                    "date": 1778259175469,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -67,16 +67,8 @@\n         Wave · Orange Money\n       </p>\n \n       {/* petit texte */}\n-      <p\n-        style={{\n-          fontSize: \"11px\",\n-          color: \"#5A4E45\",\n-          letterSpacing: \"0.1em\",\n-        }}\n-      >\n-        Réservation via WhatsApp uniquement\n-      </p>\n+       \n     </footer>\n   );\n }\n\\ No newline at end of file\n"
                 }
             ],
             "date": 1778118701677,

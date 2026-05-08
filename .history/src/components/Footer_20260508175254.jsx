@@ -67,7 +67,7 @@ export default function Footer() {
         Wave · Orange Money
       </p>
 
-      
+      {/* petit texte */}
        
     </footer>
   );

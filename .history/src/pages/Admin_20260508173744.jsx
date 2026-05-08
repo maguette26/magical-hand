@@ -16,6 +16,7 @@ import { ChevronLeft, ChevronRight, Clock, X } from 'lucide-react';
 
 const CATEGORIES = ['Glam', 'Cérémonie', 'Naturel'];
 const ALL_SLOTS = ['08:00', '09:00', '10:00', '11:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00','19:00', '20:00','21:00'];
+
 const TAB_STYLE = (active) => ({
   padding: '12px 24px',
   background: active ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'transparent',
@@ -50,7 +51,6 @@ export default function Admin() {
 
   const next28Days = Array.from({ length: 28 }, (_, i) => addDays(new Date(), i + 1));
   const visibleWeek = Array.from({ length: 7 }, (_, i) => addDays(new Date(), calOffset * 7 + i + 1));
-const [editingPhoto, setEditingPhoto] = useState(null); // { id, title, category }
 
   // Firestore listeners
   useEffect(() => {
@@ -123,22 +123,7 @@ const [editingPhoto, setEditingPhoto] = useState(null); // { id, title, category
     toast.error('Erreur suppression');
   }
 };
-const handleUpdatePhoto = async () => {
-  if (!editingPhoto?.title?.trim()) {
-    toast.error("Le titre ne peut pas être vide");
-    return;
-  }
-  try {
-    await updateDoc(doc(db, 'photos', editingPhoto.id), {
-      title: editingPhoto.title.trim(),
-      category: editingPhoto.category,
-    });
-    toast.success("Photo mise à jour !");
-    setEditingPhoto(null);
-  } catch {
-    toast.error("Erreur mise à jour");
-  }
-};
+
   // ---- AVAILABILITY ----
   // Get slots configured for a date
   const getSlotsForDate = (dateStr) => availability[dateStr]?.slots || [];
@@ -865,7 +850,7 @@ const handleUpdatePhoto = async () => {
     </div>
   </motion.div>
 ))}
-                 
+                ))}
               </AnimatePresence>
             </div>
 

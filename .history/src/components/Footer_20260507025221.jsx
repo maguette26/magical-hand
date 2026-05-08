@@ -42,7 +42,7 @@ export default function Footer() {
           marginBottom: "10px",
         }}
       >
-        📞Téléphone +221 77 669 57 90
+        📞Téléphone: +221 77 669 57 90
       </p>
 
       {/* Paiement */}
