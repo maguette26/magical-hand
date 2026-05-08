@@ -161,52 +161,9 @@ export default function Admin() {
   };
 
   // ---- BOOKINGS ----
-  const notifyClientWhatsApp = (booking, status) => {
-    const phone = booking.phone?.replace(/\s/g, '');
-    if (!phone) return; // pas de numéro → pas de notif
-    const cleanPhone = phone.startsWith('+') ? phone.slice(1) : phone.startsWith('00') ? phone.slice(2) : `221${phone}`;
-
-    let message = '';
-    if (status === 'confirmed') {
-      message =
-`✨ *MAGICAL HAND BY MAMIFA* ✨
-━━━━━━━━━━━━━━━━━━━
-Bonjour *${booking.name}* 💄
-
-Votre rendez-vous est *confirmé* ! 🎉
-
-💋 Prestation : ${booking.service}
-📅 Date : ${booking.date}
-🕐 Heure : ${booking.time}
-
-Merci pour votre confiance. À très bientôt !
-_Magical Hand by Mamifa_ ✨`;
-    } else if (status === 'cancelled') {
-      message =
-`✨ *MAGICAL HAND BY MAMIFA* ✨
-━━━━━━━━━━━━━━━━━━━
-Bonjour *${booking.name}*,
-
-Malheureusement votre réservation du *${booking.date} à ${booking.time}* n'a pas pu être confirmée.
-
-Cela peut être dû à un problème avec la preuve de paiement ou à une indisponibilité.
-
-N'hésitez pas à nous recontacter pour fixer un nouveau rendez-vous.
-
-_Magical Hand by Mamifa_ 💄`;
-    }
-
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
-  };
-
   const updateBookingStatus = async (id, status) => {
     await updateDoc(doc(db, 'bookings', id), { status, updatedAt: serverTimestamp() });
     toast.success(`RDV : ${STATUS_LABEL[status]}`);
-    // Find the booking and notify client
-    const booking = bookings.find(b => b.id === id);
-    if (booking && (status === 'confirmed' || status === 'cancelled')) {
-      notifyClientWhatsApp(booking, status);
-    }
   };
 
   // ---- PHOTOS ----

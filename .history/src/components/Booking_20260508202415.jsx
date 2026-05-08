@@ -147,9 +147,9 @@ export default function Booking() {
       const msg =
 `✅ *MAGICAL HAND — Preuve de paiement*
 ━━━━━━━━━━━━━━━━━━━
-👤 ${name}${phone ? `\n📱 ${phone}` : ''}
-💋 ${service.label} — ${service.price}
-📅 ${dateStr} à ${selectedTime}
+👤 Nom:${name} Téléphone:${phone ? `\n📱 ${phone}` : ''}
+💋 Type de maquillage: ${service.label} — ${service.price}
+📅 Date: ${dateStr} à ${selectedTime}
 💳 Acompte : ${ACOMPTE_AMOUNT.toLocaleString()} FCFA
 ━━━━━━━━━━━━━━━━━━━
 La preuve de paiement a été envoyée.
@@ -167,7 +167,7 @@ Merci de valider dans le dashboard.`;
   const canProceed = () => {
     if (step === 1) return selectedService !== null;
     if (step === 2) return selectedDate !== null && selectedTime !== null;
-    if (step === 3) return name.trim().length > 2 && phone.trim().length > 5;
+    if (step === 3) return name.trim().length > 2;
     return false;
   };
 
@@ -362,7 +362,7 @@ Merci de valider dans le dashboard.`;
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {[
                   { label: 'Votre prénom *', value: name, setter: setName, placeholder: 'Ex: Aïssatou', type: 'text' },
-                  { label: 'Votre numéro de téléphone *', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel' },
+                  { label: 'Votre numéro de téléphone', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel' },
                 ].map((field) => (
                   <div key={field.label}>
                     <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '8px' }}>{field.label}</label>
@@ -401,7 +401,7 @@ Merci de valider dans le dashboard.`;
                 <div>
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>Acompte requis</p>
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.7, margin: 0 }}>
-                    Un acompte de <strong style={{ color: '#FAF6EF' }}>{ACOMPTE_AMOUNT.toLocaleString()} FCFA</strong> est requis pour confirmer votre réservation.
+                    Un acompte à partir de  <strong style={{ color: '#FAF6EF' }}>{ACOMPTE_AMOUNT.toLocaleString()} FCFA</strong> est requis pour confirmer votre réservation.
                     Paiement par <strong style={{ color: '#FAF6EF' }}>Wave</strong> ou <strong style={{ color: '#FAF6EF' }}>Orange Money</strong> au <strong style={{ color: '#C9A84C' }}>+221 77 669 57 90</strong>.
                   </p>
                 </div>
