@@ -40,7 +40,7 @@ const SERVICES = [
     id: 4,
     title: 'Cérémonie',
     subtitle: 'Henné · Baptême · Mariage',
-    price: ' 25 000 FCFA',
+    price: 'À partir de 25 000 FCFA',
     priceShort: '25k+',
     description: 'Pour vos grands jours — mariage, baptême, cérémonie culturelle.',
     features: ['Consultation style', 'Durabilité longue', 'Maquillage résistant', 'Finition luxe'],

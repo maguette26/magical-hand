@@ -148,8 +148,8 @@ export default function Booking() {
 `✅ *MAGICAL HAND — Preuve de paiement*
 ━━━━━━━━━━━━━━━━━━━
 👤 Nom:${name} Téléphone:${phone ? `\n📱 ${phone}` : ''}
-💋 Type de maquillage: ${service.label} — ${service.price}
-📅 Date: ${dateStr} à ${selectedTime}
+💋 Type de maquillage${service.label} — ${service.price}
+📅 ${dateStr} à ${selectedTime}
 💳 Acompte : ${ACOMPTE_AMOUNT.toLocaleString()} FCFA
 ━━━━━━━━━━━━━━━━━━━
 La preuve de paiement a été envoyée.
@@ -401,7 +401,7 @@ Merci de valider dans le dashboard.`;
                 <div>
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>Acompte requis</p>
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.7, margin: 0 }}>
-                    Un acompte à partir de  <strong style={{ color: '#FAF6EF' }}>{ACOMPTE_AMOUNT.toLocaleString()} FCFA</strong> est requis pour confirmer votre réservation.
+                    Un acompte de <strong style={{ color: '#FAF6EF' }}>{ACOMPTE_AMOUNT.toLocaleString()} FCFA</strong> est requis pour confirmer votre réservation.
                     Paiement par <strong style={{ color: '#FAF6EF' }}>Wave</strong> ou <strong style={{ color: '#FAF6EF' }}>Orange Money</strong> au <strong style={{ color: '#C9A84C' }}>+221 77 669 57 90</strong>.
                   </p>
                 </div>

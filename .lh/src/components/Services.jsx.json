@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 7,
+            "activePatchIndex": 8,
             "patches": [
                 {
                     "date": 1778165530433,
@@ -36,6 +36,10 @@
                 {
                     "date": 1778165614671,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -5,9 +5,9 @@\n   {\n     id: 1,\n     title: 'Maquillage simple',\n     subtitle: 'simple',\n-    price: 'À partir de 7 000 FCFA',\n+    price: ' 7 000 FCFA',\n     priceShort: '5k+',\n     description: 'Remise en beauté rapide pour un éclat instantané.',\n     features: ['Peau fraîche', 'Lèvres ravivées', 'Finition naturelle'],\n     tag: 'Express',\n"
+                },
+                {
+                    "date": 1778261382519,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -39,9 +39,9 @@\n   {\n     id: 4,\n     title: 'Cérémonie',\n     subtitle: 'Henné · Baptême · Mariage',\n-    price: 'À partir de 25 000 FCFA',\n+    price: ' 25 000 FCFA',\n     priceShort: '25k+',\n     description: 'Pour vos grands jours — mariage, baptême, cérémonie culturelle.',\n     features: ['Consultation style', 'Durabilité longue', 'Maquillage résistant', 'Finition luxe'],\n     tag: 'Premium',\n"
                 }
             ],
             "date": 1778165530433,
