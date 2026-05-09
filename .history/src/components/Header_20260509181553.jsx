@@ -55,7 +55,7 @@ export default function Header() {
   onClick={() => scrollTo('#hero')}
 >
   <img
-    src="/images/logo.jpeg"
+    src="/images/logo.png"
     alt="Magical Hand by Mamifa"
     style={{
       height: '52px',
