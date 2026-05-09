@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 11,
+            "activePatchIndex": 12,
             "patches": [
                 {
                     "date": 1778116832963,
@@ -52,6 +52,10 @@
                 {
                     "date": 1778347051068,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -54,9 +54,9 @@\n   style={{ cursor: 'pointer' }}\n   onClick={() => scrollTo('#hero')}\n >\n   <img\n-    src=\"/images/logo.png\"\n+    src=\"/images/logo.jpeg\"\n     alt=\"Magical Hand by Mamifa\"\n     style={{\n       height: '52px',\n       width: 'auto',\n"
+                },
+                {
+                    "date": 1778347550577,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -47,25 +47,39 @@\n           transition: 'all 0.4s ease',\n         }}\n       >\n         {/* Logo */}\n-       {/* Logo */}\n-<motion.div\n-  whileHover={{ scale: 1.02 }}\n-  style={{ cursor: 'pointer' }}\n-  onClick={() => scrollTo('#hero')}\n->\n-  <img\n-    src=\"/images/logo.jpeg\"\n-    alt=\"Magical Hand by Mamifa\"\n-    style={{\n-      height: '52px',\n-      width: 'auto',\n-      objectFit: 'contain',\n-      display: 'block',\n-    }}\n-  />\n-</motion.div>\n+        <motion.div\n+          whileHover={{ scale: 1.02 }}\n+          style={{ cursor: 'pointer' }}\n+          onClick={() => scrollTo('#hero')}\n+        >\n+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>\n+            <span style={{\n+              fontFamily: 'Cormorant Garamond, serif',\n+              fontSize: '26px',\n+              fontWeight: 600,\n+              letterSpacing: '0.04em',\n+              background: 'linear-gradient(135deg, #C9A84C, #E8C97A, #C9A84C)',\n+              backgroundSize: '200% auto',\n+              WebkitBackgroundClip: 'text',\n+              WebkitTextFillColor: 'transparent',\n+              animation: 'shimmer 3s linear infinite',\n+            }}>\n+              Magical Hand\n+            </span>\n+            <span style={{\n+              fontFamily: 'Jost, sans-serif',\n+              fontSize: '10px',\n+              fontWeight: 300,\n+              letterSpacing: '0.25em',\n+              color: '#8A7968',\n+              textTransform: 'uppercase',\n+            }}>\n+              by Mamifa\n+            </span>\n+          </div>\n+        </motion.div>\n \n         {/* Desktop Nav */}\n         <nav style={{ display: 'flex', gap: '36px', alignItems: 'center' }}\n           className=\"desktop-nav\">\n"
                 }
             ],
             "date": 1778116832963,

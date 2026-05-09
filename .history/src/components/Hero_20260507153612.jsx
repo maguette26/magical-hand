@@ -54,7 +54,7 @@ export default function Hero() {
             marginBottom: '20px',
           }}
         >
-          Artiste Maquilleuse Professionnelle
+          Artiste Maquilleuge Professionnelle
         </motion.p>
 
         <motion.h1

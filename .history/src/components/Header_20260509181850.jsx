@@ -48,37 +48,23 @@ export default function Header() {
         }}
       >
         {/* Logo */}
-        <motion.div
-          whileHover={{ scale: 1.02 }}
-          style={{ cursor: 'pointer' }}
-          onClick={() => scrollTo('#hero')}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
-            <span style={{
-              fontFamily: 'Cormorant Garamond, serif',
-              fontSize: '26px',
-              fontWeight: 600,
-              letterSpacing: '0.04em',
-              background: 'linear-gradient(135deg, #C9A84C, #E8C97A, #C9A84C)',
-              backgroundSize: '200% auto',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              animation: 'shimmer 3s linear infinite',
-            }}>
-              Magical Hand
-            </span>
-            <span style={{
-              fontFamily: 'Jost, sans-serif',
-              fontSize: '10px',
-              fontWeight: 300,
-              letterSpacing: '0.25em',
-              color: '#8A7968',
-              textTransform: 'uppercase',
-            }}>
-              by Mamifa
-            </span>
-          </div>
-        </motion.div>
+       {/* Logo */}
+<motion.div
+  whileHover={{ scale: 1.02 }}
+  style={{ cursor: 'pointer' }}
+  onClick={() => scrollTo('#hero')}
+>
+  <img
+    src="/images/logo.jpeg"
+    alt="Magical Hand by Mamifa"
+    style={{
+      height: '52px',
+      width: 'auto',
+      objectFit: 'contain',
+      display: 'block',
+    }}
+  />
+</motion.div>
 
         {/* Desktop Nav */}
         <nav style={{ display: 'flex', gap: '36px', alignItems: 'center' }}
