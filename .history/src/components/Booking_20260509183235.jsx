@@ -408,14 +408,14 @@ _Magical Hand by Mamifa_ ✨`;
 
       // WA message to admin
       const adminMsg = isPaidFull
-        ? `✔️ *MAGICAL HAND — Paiement complet*\n━━━━━━━━━━━━━━━━━━━\n👤Nom: ${name}\n📱 Numéro de téléphone: ${phone}\n💋Type de maquillage: ${service.label}\n📅Date: ${dateStr} à ${selectedTime} heure\n💳 Total payé : ${montantTotal.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`
-        : `✔️ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤Nom: ${name}\n📱Numéro de téléphone: ${phone}\n💋Type de maquillage: ${service.label}\n📅Date: ${dateStr} à ${selectedTime} heure\n💳 Acompte payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
+        ? `✔️ *MAGICAL HAND — Paiement complet*\n━━━━━━━━━━━━━━━━━━━\n👤Nom: ${name}\n📱 Numéro de téléphone: ${phone}\n💋Type de maquillage ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Total payé : ${montantTotal.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`
+        : `✔️ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Acompte payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
       window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(adminMsg)}`, '_blank');
 
       // WA message to client
       const clientMsg = isPaidFull
-        ? `✔️ Paiement complet reçu*\nMerci ${name}, votre rendez-vous est entièrement réglé.\n💋Type de maquillage: ${service.label} — ${dateStr} à ${selectedTime} heure\n_Magical Hand by Mamifa_ ✨`
-        : `✔️ Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime} heure\n_Magical Hand by Mamifa_ ✨`;
+        ? `✔️ Paiement complet reçu*\nMerci ${name}, votre rendez-vous est entièrement réglé.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`
+        : `✔️ Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`;
       window.open(`https://wa.me/${phone.replace(/\s/g,'')}?text=${encodeURIComponent(clientMsg)}`, '_blank');
 
       setPaymentSent(true);
@@ -470,9 +470,9 @@ _Magical Hand by Mamifa_ ✨`;
         const msg =
 `❌ *MAGICAL HAND — Demande d'annulation*
 ━━━━━━━━━━━━━━━━━━━
-👤Nom: ${foundBooking.name}${foundBooking.phone ? `\n📱Numéro de téléphone: ${foundBooking.phone}` : ''}
-💋Type de maquillage: ${foundBooking.service}
-📅Date: ${foundBooking.date} à ${foundBooking.time} heure
+👤 ${foundBooking.name}${foundBooking.phone ? `\n📱 ${foundBooking.phone}` : ''}
+💋 ${foundBooking.service}
+📅 ${foundBooking.date} à ${foundBooking.time}
 ━━━━━━━━━━━━━━━━━━━
 Le client demande l'annulation de son RDV confirmé.
 Merci de traiter la demande dans le dashboard.`;

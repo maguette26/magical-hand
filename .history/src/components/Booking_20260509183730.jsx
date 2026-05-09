@@ -471,8 +471,8 @@ _Magical Hand by Mamifa_ ✨`;
 `❌ *MAGICAL HAND — Demande d'annulation*
 ━━━━━━━━━━━━━━━━━━━
 👤Nom: ${foundBooking.name}${foundBooking.phone ? `\n📱Numéro de téléphone: ${foundBooking.phone}` : ''}
-💋Type de maquillage: ${foundBooking.service}
-📅Date: ${foundBooking.date} à ${foundBooking.time} heure
+💋T ${foundBooking.service}
+📅 ${foundBooking.date} à ${foundBooking.time}
 ━━━━━━━━━━━━━━━━━━━
 Le client demande l'annulation de son RDV confirmé.
 Merci de traiter la demande dans le dashboard.`;
