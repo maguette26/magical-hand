@@ -54,7 +54,7 @@ const STEPS = [
 
 // ─── Helper : notifier l'admin WhatsApp ──────────────────────────────────────
 function notifyAdminWhatsApp(message) {
-  window.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  window.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank');
 }
 
 // ─── Gallery Swipe Component ────────────────────────────────────────────────
