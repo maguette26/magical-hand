@@ -54,7 +54,7 @@ const STEPS = [
 
 // ─── Helper : notifier l'admin WhatsApp ──────────────────────────────────────
 function notifyAdminWhatsApp(message) {
-  window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`) ;
+  window.location.href=`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
 
 // ─── Gallery Swipe Component ────────────────────────────────────────────────
@@ -180,7 +180,7 @@ function CountdownTimer({ expiresAt }) {
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
-      setRemaining(`${h.toString().padStart(2, '0')}h ${m.toString().padStart(2, '0')}m ${s.toString().padStart(2, '0')}s`);
+      setRemaining(`${h.toString().padStart(2,'0')}h ${m.toString().padStart(2,'0')}m ${s.toString().padStart(2,'0')}s`);
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -194,58 +194,19 @@ function CountdownTimer({ expiresAt }) {
   );
 }
 
-// ─── Helper : convertir un File en JPEG via canvas (fix Safari iOS / HEIC) ───
-function convertToJpeg(file) {
-  return new Promise((resolve, reject) => {
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        // Limiter la résolution max à 2048px pour éviter les crashes mémoire sur mobile
-        const MAX = 2048;
-        let { naturalWidth: w, naturalHeight: h } = img;
-        if (w > MAX || h > MAX) {
-          if (w > h) { h = Math.round((h * MAX) / w); w = MAX; }
-          else       { w = Math.round((w * MAX) / h); h = MAX; }
-        }
-        canvas.width  = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        // Fond blanc (évite le canal alpha transparent qui casse certains uploads)
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-
-        canvas.toBlob(
-          (blob) => {
-            URL.revokeObjectURL(objectUrl);
-            if (!blob) {
-              reject(new Error('canvas.toBlob() a retourné null'));
-              return;
-            }
-            const safeFile = new File([blob], 'preuve-paiement.jpg', { type: 'image/jpeg' });
-            resolve(safeFile);
-          },
-          'image/jpeg',
-          0.88
-        );
-      } catch (canvasErr) {
-        URL.revokeObjectURL(objectUrl);
-        reject(canvasErr);
-      }
-    };
-
-    img.onerror = () => {
-      URL.revokeObjectURL(objectUrl);
-      // Fallback : retourner le fichier original si le canvas échoue
-      console.warn('[convertToJpeg] Impossible de charger l\'image dans le canvas, fichier original utilisé.');
-      resolve(file);
-    };
-
-    img.src = objectUrl;
-  });
+// ─── Helper : réinitialiser le formulaire complet ─────────────────────────────
+function getEmptyForm() {
+  return {
+    selectedService: null,
+    selectedDate: null,
+    selectedTime: null,
+    name: '',
+    phone: '',
+    paymentType: 'acompte',
+    customAmount: '',
+    weekOffset: 0,
+    step: 1,
+  };
 }
 
 // ─── Main Booking Component ───────────────────────────────────────────────────
@@ -272,7 +233,6 @@ export default function Booking() {
   const [uploading, setUploading] = useState(false);
   const [paymentSent, setPaymentSent] = useState(false);
   const [creatingBooking, setCreatingBooking] = useState(false);
-  const [convertingImage, setConvertingImage] = useState(false);
 
   // Modification
   const [showModifyModal, setShowModifyModal] = useState(false);
@@ -322,6 +282,7 @@ export default function Booking() {
     if (redirectCountdown <= 0) {
       setShowCancelModal(false);
       setRedirectCountdown(null);
+      // Scroll vers la section accueil ou haut de page
       const accueil = document.getElementById('accueil');
       if (accueil) {
         accueil.scrollIntoView({ behavior: 'smooth' });
@@ -367,8 +328,11 @@ export default function Booking() {
   }, [modifyForm.date, availability]);
 
   // ── Changement de service : réinitialisation COMPLÈTE ─────────────────────
+  // Si l'utilisateur sélectionne un service différent de celui en cours,
+  // on réinitialise tout le formulaire et on revient à l'étape 1.
   const handleSelectService = (serviceId) => {
     if (selectedService !== null && selectedService !== serviceId) {
+      // Réinitialisation totale
       setSelectedDate(null);
       setSelectedTime(null);
       setName('');
@@ -401,31 +365,11 @@ export default function Booking() {
   const isSlotBooked = (slot) => bookedSlots.includes(slot);
   const openSlots = getAvailableSlots();
 
-  // ── Sélection de la preuve — conversion JPEG pour Safari iOS / HEIC ────────
-  const handleProofChange = async (e) => {
+  const handleProofChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    console.log('[ProofChange] Fichier sélectionné — nom:', file.name, '| type:', file.type || '(vide)', '| taille:', file.size, 'bytes');
-
-    setConvertingImage(true);
-    setProofFile(null);
-    setProofPreview(null);
-
-    try {
-      // Conversion via canvas : règle les problèmes HEIC/HEIF, type vide, et transparence
-      const safeFile = await convertToJpeg(file);
-      console.log('[ProofChange] Conversion OK — nom:', safeFile.name, '| type:', safeFile.type, '| taille:', safeFile.size, 'bytes');
-      setProofFile(safeFile);
-      setProofPreview(URL.createObjectURL(safeFile));
-    } catch (convErr) {
-      console.error('[ProofChange] Erreur conversion canvas:', convErr);
-      // Fallback : utiliser le fichier brut
-      setProofFile(file);
-      setProofPreview(URL.createObjectURL(file));
-    } finally {
-      setConvertingImage(false);
-    }
+    setProofFile(file);
+    setProofPreview(URL.createObjectURL(file));
   };
 
   // ── Create booking ──────────────────────────────────────────────────────────
@@ -472,6 +416,7 @@ export default function Booking() {
         expirationAcompteAt,
       });
 
+      // ✅ Notification WhatsApp ADMIN uniquement — nouvelle réservation
       const adminMsg =
 `📅 *MAGICAL HAND — Nouvelle réservation*
 ━━━━━━━━━━━━━━━━━━━
@@ -486,9 +431,12 @@ Statut : En attente d'acompte ⏳
 N° réservation : ${docRef.id}`;
       notifyAdminWhatsApp(adminMsg);
 
+      
+      // (WhatsApp s'ouvre déjà avec un message admin prérempli)
+
       setStep(5);
     } catch (err) {
-      console.error('[CreateBooking] Erreur:', err);
+      console.error(err);
       alert('Erreur lors de la création de la réservation. Veuillez réessayer.');
     } finally {
       setCreatingBooking(false);
@@ -500,11 +448,7 @@ N° réservation : ${docRef.id}`;
     if (!proofFile || !bookingId || uploading) return;
     setUploading(true);
     try {
-      console.log('[SendProof] Démarrage upload — fichier:', proofFile.name, '| type:', proofFile.type, '| taille:', proofFile.size, 'bytes');
-
       const url = await uploadImage(proofFile);
-      console.log('[SendProof] Upload réussi — URL:', url);
-
       const isPaidFull = paymentType === 'total';
       const newStatut = isPaidFull ? 'paye_entierement' : 'acompte_paye';
       const montant = montantPaye;
@@ -534,31 +478,22 @@ N° réservation : ${docRef.id}`;
         }
       }
 
-      // Notification admin WhatsApp paiement
+      // ✅ Notification admin WhatsApp paiement
       const adminMsg = isPaidFull
         ? `💰 *MAGICAL HAND — Paiement complet reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant total payé : ${montantTotal.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`
         : `✅ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
       notifyAdminWhatsApp(adminMsg);
 
-      // Notification client WhatsApp
+      // ✅ Notification client WhatsApp — uniquement après paiement réel
       const clientMsg = isPaidFull
         ? `✔️ *Paiement complet reçu*\nMerci *${name}*, votre rendez-vous est entièrement réglé.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`
         : `✔️ *Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`;
-      window.open(`https://wa.me/${phone.replace(/\s/g, '')}?text=${encodeURIComponent(clientMsg)}`, '_blank');
+      window.open(`https://wa.me/${phone.replace(/\s/g,'')}?text=${encodeURIComponent(clientMsg)}`, '_blank');
 
       setPaymentSent(true);
     } catch (err) {
-      console.error('[SendProof] Erreur complète:', err);
-      console.error('[SendProof] Message:', err?.message);
-      console.error('[SendProof] Stack:', err?.stack);
-      console.error('[SendProof] Fichier au moment de l\'erreur — nom:', proofFile?.name, '| type:', proofFile?.type, '| taille:', proofFile?.size);
-
-      alert(
-        `Erreur lors de l'envoi de la preuve.\n\n` +
-        `Détail : ${err?.message || 'Erreur inconnue'}\n\n` +
-        `Fichier : ${proofFile?.name} (${proofFile?.type || 'type inconnu'}, ${Math.round((proofFile?.size || 0) / 1024)} Ko)\n\n` +
-        `Veuillez réessayer ou contacter Mamifa directement sur WhatsApp au +221 77 669 57 90.`
-      );
+      console.error(err);
+      alert('Erreur lors de l\'envoi. Veuillez réessayer.');
     } finally {
       setUploading(false);
     }
@@ -603,6 +538,7 @@ N° réservation : ${docRef.id}`;
         }
       }
 
+      // ✅ Notification admin WhatsApp annulation — uniquement si acompte versé
       const hadPayment = (foundBooking.montantPaye || 0) > 0;
       if (!isFreeCancel || hadPayment) {
         const adminMsg =
@@ -617,6 +553,7 @@ ${isFreeCancel ? 'Annulation libre — créneau automatiquement libéré.' : 'Le
       }
 
       setCancelStatus(isFreeCancel ? 'cancelled_free' : 'cancel_requested');
+      // Démarrer le compte à rebours de redirection (5 secondes)
       setRedirectCountdown(5);
     } catch { setCancelStatus('error'); }
   };
@@ -664,6 +601,7 @@ ${isFreeCancel ? 'Annulation libre — créneau automatiquement libéré.' : 'Le
         status: 'modification_demandee',
       });
 
+      // ✅ Notification admin WhatsApp modification
       const changeLines = Object.entries(changes).map(([k, v]) => `• ${k} : ${v}`).join('\n');
       const adminMsg =
 `✏️ *MAGICAL HAND — Demande de modification*
@@ -710,7 +648,8 @@ Merci de valider dans votre dashboard.`;
         </h2>
         <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg, transparent, #C9A84C, transparent)', margin: '0 auto 24px' }} />
         <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '14px', color: '#8A7968', maxWidth: '440px', margin: '0 auto' }}>
-          Choisissez votre prestation, votre date, et sécurisez votre réservation avec un acompte (obligatoire) minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
+          Choisissez votre prestation, votre date, et sécurisez votre réservation avec un acompte(obligatoire) minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
+          
         </p>
       </motion.div>
 
@@ -976,26 +915,9 @@ Merci de valider dans votre dashboard.`;
 
                   <div style={{ marginBottom: '20px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '12px' }}>Preuve de paiement *</p>
-                    <div
-                      onClick={() => !convertingImage && proofRef.current?.click()}
-                      style={{
-                        border: proofPreview ? '1px solid rgba(201,168,76,0.5)' : '2px dashed rgba(201,168,76,0.25)',
-                        borderRadius: '6px', padding: proofPreview ? '0' : '32px',
-                        cursor: convertingImage ? 'wait' : 'pointer',
-                        transition: 'all 0.3s', textAlign: 'center', overflow: 'hidden',
-                        background: 'rgba(255,255,255,0.02)',
-                      }}
-                      onMouseEnter={e => { if (!proofPreview && !convertingImage) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.6)'; }}
-                      onMouseLeave={e => { if (!proofPreview) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.25)'; }}
-                    >
+                    <div onClick={() => proofRef.current?.click()} style={{ border: proofPreview ? '1px solid rgba(201,168,76,0.5)' : '2px dashed rgba(201,168,76,0.25)', borderRadius: '6px', padding: proofPreview ? '0' : '32px', cursor: 'pointer', transition: 'all 0.3s', textAlign: 'center', overflow: 'hidden', background: 'rgba(255,255,255,0.02)' }} onMouseEnter={e => { if (!proofPreview) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.6)'; }} onMouseLeave={e => { if (!proofPreview) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.25)'; }}>
                       <input ref={proofRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleProofChange} />
-
-                      {convertingImage ? (
-                        <div style={{ padding: '20px 0' }}>
-                          <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: '28px', height: '28px', border: '2px solid rgba(201,168,76,0.2)', borderTopColor: '#C9A84C', borderRadius: '50%', margin: '0 auto 12px' }} />
-                          <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968', margin: 0 }}>Traitement de l'image…</p>
-                        </div>
-                      ) : proofPreview ? (
+                      {proofPreview ? (
                         <div style={{ position: 'relative' }}>
                           <img src={proofPreview} alt="Preuve" style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', display: 'block' }} />
                           <div style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(10,10,10,0.8)', borderRadius: '4px', padding: '6px 12px', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C' }}>Cliquer pour changer</div>
@@ -1004,29 +926,15 @@ Merci de valider dans votre dashboard.`;
                         <div>
                           <Upload size={28} color="#C9A84C" style={{ marginBottom: '12px', opacity: 0.7 }} />
                           <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', margin: 0 }}>Cliquer pour uploader la preuve de paiement</p>
-                          <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', opacity: 0.5, marginTop: '6px' }}>PNG, JPG, HEIC — Max 5MB</p>
+                          <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', opacity: 0.5, marginTop: '6px' }}>PNG, JPG — Max 5MB</p>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  <motion.button
-                    onClick={handleSendProof}
-                    disabled={!proofFile || uploading || convertingImage}
-                    whileHover={proofFile && !uploading && !convertingImage ? { scale: 1.03, boxShadow: '0 8px 30px rgba(37,211,102,0.3)' } : {}}
-                    style={{
-                      width: '100%', padding: '18px',
-                      background: proofFile && !uploading && !convertingImage ? 'linear-gradient(135deg, #25D366, #128C7E)' : 'rgba(255,255,255,0.05)',
-                      color: proofFile && !uploading && !convertingImage ? '#FFFFFF' : '#8A7968',
-                      border: 'none', borderRadius: '4px', fontFamily: 'Jost, sans-serif',
-                      fontSize: '13px', letterSpacing: '0.2em', textTransform: 'uppercase',
-                      fontWeight: 600,
-                      cursor: proofFile && !uploading && !convertingImage ? 'pointer' : 'not-allowed',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                    }}
-                  >
+                  <motion.button onClick={handleSendProof} disabled={!proofFile || uploading} whileHover={proofFile && !uploading ? { scale: 1.03, boxShadow: '0 8px 30px rgba(37,211,102,0.3)' } : {}} style={{ width: '100%', padding: '18px', background: proofFile && !uploading ? 'linear-gradient(135deg, #25D366, #128C7E)' : 'rgba(255,255,255,0.05)', color: proofFile && !uploading ? '#FFFFFF' : '#8A7968', border: 'none', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '13px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: proofFile && !uploading ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
                     <MessageCircle size={18} />
-                    {uploading ? 'Envoi en cours...' : convertingImage ? 'Traitement…' : 'Envoyer la preuve'}
+                    {uploading ? 'Envoi en cours...' : 'Envoyer la preuve'}
                   </motion.button>
                 </>
               ) : (
@@ -1167,6 +1075,7 @@ Merci de valider dans votre dashboard.`;
                 </>
               )}
 
+              {/* ── Success states avec compte à rebours de redirection vers l'accueil ── */}
               {(cancelStatus === 'cancelled_free' || cancelStatus === 'cancel_requested') && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '10px 0' }}>
                   <CheckCircle2 size={40} color={cancelStatus === 'cancelled_free' ? '#25D366' : '#E8A44C'} style={{ marginBottom: '16px' }} />
@@ -1183,6 +1092,7 @@ Merci de valider dans votre dashboard.`;
                       <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', margin: '0 0 8px' }}>
                         Redirection vers l'accueil dans <strong style={{ fontSize: '16px' }}>{redirectCountdown}s</strong>
                       </p>
+                      {/* Barre de progression */}
                       <div style={{ height: '3px', background: 'rgba(201,168,76,0.15)', borderRadius: '2px', overflow: 'hidden' }}>
                         <motion.div
                           initial={{ width: '100%' }}
@@ -1213,6 +1123,7 @@ Merci de valider dans votre dashboard.`;
                 <button onClick={() => setShowModifyModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
               </div>
 
+              {/* Lookup */}
               {(modifyStatus === null || modifyStatus === 'not_found' || modifyStatus === 'error' || modifyStatus === 'no_changes') && (
                 <>
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', marginBottom: '20px', lineHeight: 1.6 }}>
