@@ -10,7 +10,7 @@ import { fr } from 'date-fns/locale';
 import {
   Sparkles, Camera, Crown, Clock, ChevronLeft, ChevronRight,
   MessageCircle, CreditCard, Check, Wand2, Upload, AlertCircle,
-  CheckCircle2, XCircle, ArrowRight, Images, Edit3, Calendar
+  CheckCircle2, XCircle, ArrowRight, Images
 } from 'lucide-react';
 import { uploadImage } from '../utils/uploadImage';
 
@@ -51,11 +51,6 @@ const STEPS = [
   { n: 4, label: 'Paiement' },
   { n: 5, label: 'Confirmation' },
 ];
-
-// ─── Helper : notifier l'admin WhatsApp ──────────────────────────────────────
-function notifyAdminWhatsApp(message) {
-  window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`, '_blank');
-}
 
 // ─── Gallery Swipe Component ────────────────────────────────────────────────
 export function GallerySwipeHint({ photos = [] }) {
@@ -194,21 +189,6 @@ function CountdownTimer({ expiresAt }) {
   );
 }
 
-// ─── Helper : réinitialiser le formulaire complet ─────────────────────────────
-function getEmptyForm() {
-  return {
-    selectedService: null,
-    selectedDate: null,
-    selectedTime: null,
-    name: '',
-    phone: '',
-    paymentType: 'acompte',
-    customAmount: '',
-    weekOffset: 0,
-    step: 1,
-  };
-}
-
 // ─── Main Booking Component ───────────────────────────────────────────────────
 export default function Booking() {
   const [step, setStep] = useState(1);
@@ -222,7 +202,7 @@ export default function Booking() {
   const [weekOffset, setWeekOffset] = useState(0);
 
   // Payment
-  const [paymentType, setPaymentType] = useState('acompte');
+  const [paymentType, setPaymentType] = useState('acompte'); // 'acompte' | 'total'
   const [customAmount, setCustomAmount] = useState('');
 
   // Step 5 — confirmation state
@@ -234,22 +214,11 @@ export default function Booking() {
   const [paymentSent, setPaymentSent] = useState(false);
   const [creatingBooking, setCreatingBooking] = useState(false);
 
-  // Modification
-  const [showModifyModal, setShowModifyModal] = useState(false);
-  const [modifyBookingId, setModifyBookingId] = useState('');
-  const [modifyStatus, setModifyStatus] = useState(null);
-  const [foundModifyBooking, setFoundModifyBooking] = useState(null);
-  const [modifyForm, setModifyForm] = useState({ service: '', date: '', time: '' });
-  const [modifyWeekOffset, setModifyWeekOffset] = useState(0);
-  const [modifyAvailSlots, setModifyAvailSlots] = useState([]);
-
   // Cancellation
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelBookingId, setCancelBookingId] = useState('');
   const [cancelStatus, setCancelStatus] = useState(null);
   const [foundBooking, setFoundBooking] = useState(null);
-  // Redirect countdown after cancellation
-  const [redirectCountdown, setRedirectCountdown] = useState(null);
 
   const proofRef = useRef();
 
@@ -270,30 +239,13 @@ export default function Booking() {
 
   const montantPaye = getAcompteAmount();
   const resteAPayer = montantTotal - montantPaye;
+  const statutPaiement = paymentType === 'total' ? 'paye_entierement' : 'acompte_paye';
 
+  // Raccourcis acompte selon le montant total
   const getAcompteShortcuts = () => {
     const shortcuts = [2000, 3000, 4000, 5000, 7000, 10000];
     return shortcuts.filter(v => v >= ACOMPTE_MIN && v < montantTotal);
   };
-
-  // ── Redirect après annulation — vers l'accueil ─────────────────────────────
-  useEffect(() => {
-    if (redirectCountdown === null) return;
-    if (redirectCountdown <= 0) {
-      setShowCancelModal(false);
-      setRedirectCountdown(null);
-      // Scroll vers la section accueil ou haut de page
-      const accueil = document.getElementById('accueil');
-      if (accueil) {
-        accueil.scrollIntoView({ behavior: 'smooth' });
-      } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-      return;
-    }
-    const timer = setTimeout(() => setRedirectCountdown(c => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [redirectCountdown]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'availability'), (snap) => {
@@ -319,37 +271,6 @@ export default function Booking() {
     }, () => {});
     return unsub;
   }, [selectedDate]);
-
-  // ── Charger les créneaux pour la modification ──────────────────────────────
-  useEffect(() => {
-    if (!modifyForm.date) { setModifyAvailSlots([]); return; }
-    const slots = availability[modifyForm.date] || [];
-    setModifyAvailSlots(slots);
-  }, [modifyForm.date, availability]);
-
-  // ── Changement de service : réinitialisation COMPLÈTE ─────────────────────
-  // Si l'utilisateur sélectionne un service différent de celui en cours,
-  // on réinitialise tout le formulaire et on revient à l'étape 1.
-  const handleSelectService = (serviceId) => {
-    if (selectedService !== null && selectedService !== serviceId) {
-      // Réinitialisation totale
-      setSelectedDate(null);
-      setSelectedTime(null);
-      setName('');
-      setPhone('');
-      setPaymentType('acompte');
-      setCustomAmount('');
-      setWeekOffset(0);
-      setBookingId(null);
-      setBookingData(null);
-      setProofFile(null);
-      setProofPreview(null);
-      setPaymentSent(false);
-      setCreatingBooking(false);
-      setStep(1);
-    }
-    setSelectedService(serviceId);
-  };
 
   const isDateAvailable = (date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -383,27 +304,33 @@ export default function Booking() {
       const acompteChoisi = montantPaye;
 
       const docRef = await addDoc(collection(db, 'bookings'), {
+        // Client
         name: name.trim(),
         phone: phone.trim(),
+        // Service
         serviceId: service.id,
         service: service.label,
         servicePrice: service.price,
+        // Date/time
         date: dateStr,
         time: selectedTime,
         dateRendezVous: `${dateStr}T${selectedTime}:00`,
+        // Payment
         montantTotal,
         montantAcompteChoisi: acompteChoisi,
         montantPaye: 0,
         resteAPayer: montantTotal,
         statutPaiement: 'en_attente_paiement',
         typeReglement: paymentType,
+        // Booking status
         statutReservation: 'en_attente_paiement',
         status: 'en_attente_paiement',
+        // Expiry
         expirationAcompteAt,
         dateReservation: serverTimestamp(),
         createdAt: serverTimestamp(),
+        // Proof
         proofUrl: null,
-        adminNotifiedNewBooking: false,
       });
 
       setBookingId(docRef.id);
@@ -416,23 +343,24 @@ export default function Booking() {
         expirationAcompteAt,
       });
 
-      // ✅ Notification WhatsApp ADMIN uniquement — nouvelle réservation
-      const adminMsg =
-`📅 *MAGICAL HAND — Nouvelle réservation*
+      // Auto-notify client via WhatsApp
+      const msg =
+`⏳ *MAGICAL HAND — Réservation en attente*
 ━━━━━━━━━━━━━━━━━━━
-👤 Cliente : ${name.trim()}
-📱 Téléphone : ${phone.trim()}
-💋 Service : ${service.label}
-📅 Date : ${dateStr} à ${selectedTime}
-💰 Montant total : ${montantTotal.toLocaleString()} FCFA
-💳 Acompte choisi : ${acompteChoisi.toLocaleString()} FCFA
-━━━━━━━━━━━━━━━━━━━
-Statut : En attente d'acompte ⏳
-N° réservation : ${docRef.id}`;
-      notifyAdminWhatsApp(adminMsg);
+Bonjour *${name.trim()}* 💄
 
-      
-      // (WhatsApp s'ouvre déjà avec un message admin prérempli)
+Votre créneau est réservé temporairement.
+
+💋 Prestation : ${service.label}
+📅 Date : ${dateStr} à ${selectedTime}
+━━━━━━━━━━━━━━━━━━━
+Vous avez *24h* pour payer un acompte de *${acompteChoisi.toLocaleString()} FCFA* afin de confirmer votre rendez-vous.
+Sans paiement dans ce délai, le créneau sera automatiquement libéré.
+
+📌 Votre N° de réservation est: ${docRef.id}
+
+_Magical Hand by Mamifa_ ✨`;
+      window.open(`https://wa.me/${phone.trim().replace(/\s/g,'')}?text=${encodeURIComponent(msg)}`, '_blank');
 
       setStep(5);
     } catch (err) {
@@ -451,7 +379,7 @@ N° réservation : ${docRef.id}`;
       const url = await uploadImage(proofFile);
       const isPaidFull = paymentType === 'total';
       const newStatut = isPaidFull ? 'paye_entierement' : 'acompte_paye';
-      const montant = montantPaye;
+      const montant = montantPaye;  
       const reste = montantTotal - montant;
 
       await updateDoc(doc(db, 'bookings', bookingId), {
@@ -465,7 +393,7 @@ N° réservation : ${docRef.id}`;
         paymentConfirmedAt: serverTimestamp(),
       });
 
-      // Libérer le créneau
+      // Block slot in availability
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const availSnap = await getDoc(doc(db, 'availability', dateStr));
       if (availSnap.exists()) {
@@ -478,16 +406,16 @@ N° réservation : ${docRef.id}`;
         }
       }
 
-      // ✅ Notification admin WhatsApp paiement
+      // WA message to admin
       const adminMsg = isPaidFull
-        ? `💰 *MAGICAL HAND — Paiement complet reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant total payé : ${montantTotal.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`
-        : `✅ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
-      notifyAdminWhatsApp(adminMsg);
+        ? `✔️ *MAGICAL HAND — Paiement complet*\n━━━━━━━━━━━━━━━━━━━\n👤Nom: ${name}\n📱 Numéro de téléphone: ${phone}\n💋Type de maquillage: ${service.label}\n📅Date: ${dateStr} à ${selectedTime} heure\n💳 Total payé : ${montantTotal.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`
+        : `✔️ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤Nom: ${name}\n📱Numéro de téléphone: ${phone}\n💋Type de maquillage: ${service.label}\n📅Date: ${dateStr} à ${selectedTime} heure\n💳 Acompte payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
+      window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(adminMsg)}`, '_blank');
 
-      // ✅ Notification client WhatsApp — uniquement après paiement réel
+      // WA message to client
       const clientMsg = isPaidFull
-        ? `✔️ *Paiement complet reçu*\nMerci *${name}*, votre rendez-vous est entièrement réglé.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`
-        : `✔️ *Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`;
+        ? `✔️ Paiement complet reçu*\nMerci ${name}, votre rendez-vous est entièrement réglé.\n💋Type de maquillage: ${service.label} — ${dateStr} à ${selectedTime} heure\n_Magical Hand by Mamifa_ ✨`
+        : `✔️ Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime} heure\n_Magical Hand by Mamifa_ ✨`;
       window.open(`https://wa.me/${phone.replace(/\s/g,'')}?text=${encodeURIComponent(clientMsg)}`, '_blank');
 
       setPaymentSent(true);
@@ -538,85 +466,21 @@ N° réservation : ${docRef.id}`;
         }
       }
 
-      // ✅ Notification admin WhatsApp annulation — uniquement si acompte versé
-      const hadPayment = (foundBooking.montantPaye || 0) > 0;
-      if (!isFreeCancel || hadPayment) {
-        const adminMsg =
-`❌ *MAGICAL HAND — Réservation annulée*
+      if (!isFreeCancel) {
+        const msg =
+`❌ *MAGICAL HAND — Demande d'annulation*
 ━━━━━━━━━━━━━━━━━━━
-👤 Cliente : ${foundBooking.name}${foundBooking.phone ? `\n📱 ${foundBooking.phone}` : ''}
+👤Nom: ${foundBooking.name}${foundBooking.phone ? `\n📱Numéro de téléphone: ${foundBooking.phone}` : ''}
 💋Type de maquillage: ${foundBooking.service}
-📅Date: ${foundBooking.date} à ${foundBooking.time}
+📅Date: ${foundBooking.date} à ${foundBooking.time} heure
 ━━━━━━━━━━━━━━━━━━━
-${isFreeCancel ? 'Annulation libre — créneau automatiquement libéré.' : 'Le client demande l\'annulation de son RDV confirmé.\nMerci de traiter la demande dans le dashboard.'}`;
-        notifyAdminWhatsApp(adminMsg);
+Le client demande l'annulation de son RDV confirmé.
+Merci de traiter la demande dans le dashboard.`;
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`, '_blank');
       }
 
       setCancelStatus(isFreeCancel ? 'cancelled_free' : 'cancel_requested');
-      // Démarrer le compte à rebours de redirection (5 secondes)
-      setRedirectCountdown(5);
     } catch { setCancelStatus('error'); }
-  };
-
-  // ── Modification lookup ──────────────────────────────────────────────────
-  const handleModifyLookup = async () => {
-    if (!modifyBookingId.trim()) return;
-    setModifyStatus('loading');
-    setFoundModifyBooking(null);
-    try {
-      const snap = await getDoc(doc(db, 'bookings', modifyBookingId.trim()));
-      if (!snap.exists()) { setModifyStatus('not_found'); return; }
-      const data = { id: snap.id, ...snap.data() };
-      setFoundModifyBooking(data);
-      setModifyForm({
-        service: data.service || '',
-        date: data.date || '',
-        time: data.time || '',
-      });
-      setModifyStatus('found');
-    } catch { setModifyStatus('error'); }
-  };
-
-  const handleConfirmModify = async () => {
-    if (!foundModifyBooking) return;
-    setModifyStatus('loading');
-    try {
-      const b = foundModifyBooking;
-      const changes = {};
-      if (modifyForm.service !== b.service) changes['Service'] = `${b.service} → ${modifyForm.service}`;
-      if (modifyForm.date !== b.date) changes['Date'] = `${b.date} → ${modifyForm.date}`;
-      if (modifyForm.time !== b.time) changes['Heure'] = `${b.time} → ${modifyForm.time}`;
-
-      if (Object.keys(changes).length === 0) {
-        setModifyStatus('no_changes');
-        return;
-      }
-
-      await updateDoc(doc(db, 'bookings', b.id), {
-        service: modifyForm.service,
-        date: modifyForm.date,
-        time: modifyForm.time,
-        modificationRequestedAt: serverTimestamp(),
-        statutReservation: 'modification_demandee',
-        status: 'modification_demandee',
-      });
-
-      // ✅ Notification admin WhatsApp modification
-      const changeLines = Object.entries(changes).map(([k, v]) => `• ${k} : ${v}`).join('\n');
-      const adminMsg =
-`✏️ *MAGICAL HAND — Demande de modification*
-━━━━━━━━━━━━━━━━━━━
-👤 Cliente : ${b.name}${b.phone ? `\n📱 ${b.phone}` : ''}
-N°réservation : ${b.id}
-━━━━━━━━━━━━━━━━━━━
-Modifications demandées :
-${changeLines}
-━━━━━━━━━━━━━━━━━━━
-Merci de valider dans votre dashboard.`;
-      notifyAdminWhatsApp(adminMsg);
-
-      setModifyStatus('modified');
-    } catch { setModifyStatus('error'); }
   };
 
   const canProceed = () => {
@@ -626,17 +490,13 @@ Merci de valider dans votre dashboard.`;
     return false;
   };
 
+  // Styles
   const inputStyle = {
     width: '100%', padding: '14px 18px', background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(201,168,76,0.25)', borderRadius: '2px', color: '#FAF6EF',
     fontFamily: 'Jost, sans-serif', fontSize: '14px', outline: 'none',
     transition: 'border 0.3s', boxSizing: 'border-box',
   };
-
-  // Jours visibles pour la modification
-  const modifyVisibleDays = Array.from({ length: 7 }, (_, i) =>
-    addDays(new Date(), modifyWeekOffset * 7 + i + 1)
-  );
 
   return (
     <section id="reserver" className="booking-section">
@@ -648,8 +508,7 @@ Merci de valider dans votre dashboard.`;
         </h2>
         <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg, transparent, #C9A84C, transparent)', margin: '0 auto 24px' }} />
         <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '14px', color: '#8A7968', maxWidth: '440px', margin: '0 auto' }}>
-          Choisissez votre prestation, votre date, et sécurisez votre réservation avec un acompte(obligatoire) minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
-          
+          Choisissez votre prestation, votre date, et sécurisez votre créneau avec un acompte minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
         </p>
       </motion.div>
 
@@ -683,7 +542,7 @@ Merci de valider dans votre dashboard.`;
                   const active = selectedService === s.id;
                   const { Icon } = s;
                   return (
-                    <motion.button key={s.id} onClick={() => handleSelectService(s.id)} whileHover={{ x: 4 }} style={{ background: active ? 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(232,201,122,0.07))' : 'rgba(255,255,255,0.02)', border: active ? '1px solid rgba(201,168,76,0.65)' : '1px solid rgba(201,168,76,0.12)', borderRadius: '6px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', width: '100%' }}>
+                    <motion.button key={s.id} onClick={() => setSelectedService(s.id)} whileHover={{ x: 4 }} style={{ background: active ? 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(232,201,122,0.07))' : 'rgba(255,255,255,0.02)', border: active ? '1px solid rgba(201,168,76,0.65)' : '1px solid rgba(201,168,76,0.12)', borderRadius: '6px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', width: '100%' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: active ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'rgba(201,168,76,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.3s' }}>
                           <Icon size={18} strokeWidth={1.5} color={active ? '#0A0A0A' : '#C9A84C'} />
@@ -762,8 +621,8 @@ Merci de valider dans votre dashboard.`;
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(22px, 4vw, 28px)', color: '#FAF6EF', marginBottom: '28px' }}>Vos informations</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {[
-                  { label: 'Votre prénom *', value: name, setter: setName, placeholder: 'Ex: Aïssatou', type: 'text' },
-                  { label: 'Votre numéro de téléphone *', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel' },
+                  { label: 'Entrez votre prénom *', value: name, setter: setName, placeholder: 'Ex: Aïssatou', type: 'text' },
+                  { label: 'Entrez votre numéro de téléphone *', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel' },
                 ].map((field) => (
                   <div key={field.label}>
                     <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '8px' }}>{field.label}</label>
@@ -781,11 +640,12 @@ Merci de valider dans votre dashboard.`;
             <div>
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(22px, 4vw, 28px)', color: '#FAF6EF', marginBottom: '28px' }}>Récapitulatif & paiement</h3>
 
+              {/* Recap */}
               {[
                 { label: 'Prestation', value: service?.label },
                 { label: 'Tarif total', value: service?.price },
                 { label: 'Date', value: selectedDate ? format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr }) : '' },
-                { label: 'Heure', value: selectedTime },
+                { label: 'Heure', value: selectedTime},
                 { label: 'Prénom', value: name },
                 phone ? { label: 'Téléphone', value: phone } : null,
               ].filter(Boolean).map((r) => (
@@ -795,43 +655,110 @@ Merci de valider dans votre dashboard.`;
                 </div>
               ))}
 
-              {/* Payment type */}
+              {/* Payment type choice */}
               <div style={{ marginTop: '24px', marginBottom: '20px' }}>
                 <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <CreditCard size={14} color="#C9A84C" /> Choisissez le montant à payer maintenant
                 </p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <motion.button onClick={() => setPaymentType('acompte')} whileHover={{ x: 3 }} style={{ padding: '16px 20px', background: paymentType === 'acompte' ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.02)', border: paymentType === 'acompte' ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(201,168,76,0.15)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+
+                  {/* Acompte */}
+                  <motion.button
+                    onClick={() => setPaymentType('acompte')}
+                    whileHover={{ x: 3 }}
+                    style={{ padding: '16px 20px', background: paymentType === 'acompte' ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.02)', border: paymentType === 'acompte' ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(201,168,76,0.15)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
+                  >
                     <div>
                       <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#FAF6EF', fontWeight: 600, marginBottom: '4px' }}>
-                        Acompte {paymentType === 'acompte' && <span style={{ marginLeft: '8px', fontSize: '10px', color: '#25D366' }}>✓ Sélectionné</span>}
+                        Acompte
+                        {paymentType === 'acompte' && <span style={{ marginLeft: '8px', fontSize: '10px', color: '#25D366' }}>✓ Sélectionné</span>}
                       </div>
-                      <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>Minimum {ACOMPTE_MIN.toLocaleString()} FCFA — reste à payer le jour J</div>
+                      <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>
+                        Minimum {ACOMPTE_MIN.toLocaleString()} FCFA — reste à payer le jour J
+                      </div>
                     </div>
-                    <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#C9A84C', fontWeight: 500, flexShrink: 0, marginLeft: '12px' }}>{montantPaye.toLocaleString()} F</div>
+                    <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#C9A84C', fontWeight: 500, flexShrink: 0, marginLeft: '12px' }}>
+                      {montantPaye.toLocaleString()} F
+                    </div>
                   </motion.button>
 
+                  {/* Champ montant personnalisé — visible si acompte sélectionné */}
                   <AnimatePresence>
                     {paymentType === 'acompte' && (
-                      <motion.div initial={{ opacity: 0, y: -8, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto' }} exit={{ opacity: 0, y: -8, height: 0 }} style={{ overflow: 'hidden' }}>
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, height: 0 }}
+                        animate={{ opacity: 1, y: 0, height: 'auto' }}
+                        exit={{ opacity: 0, y: -8, height: 0 }}
+                        style={{ overflow: 'hidden' }}
+                      >
                         <div style={{ padding: '16px 18px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.18)', borderRadius: '6px' }}>
                           <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', letterSpacing: '0.15em', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
                             Montant de l'acompte (min. {ACOMPTE_MIN.toLocaleString()} FCFA)
                           </label>
+
+                          {/* Raccourcis rapides */}
                           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
                             {getAcompteShortcuts().map(v => (
-                              <button key={v} onClick={() => setCustomAmount(String(v))} style={{ padding: '6px 14px', background: (customAmount === String(v) || (!customAmount && v === ACOMPTE_MIN)) ? 'rgba(201,168,76,0.2)' : 'rgba(255,255,255,0.03)', border: (customAmount === String(v) || (!customAmount && v === ACOMPTE_MIN)) ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(201,168,76,0.2)', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', cursor: 'pointer', transition: 'all 0.2s' }}>
+                              <button
+                                key={v}
+                                onClick={() => setCustomAmount(String(v))}
+                                style={{
+                                  padding: '6px 14px',
+                                  background: (customAmount === String(v) || (!customAmount && v === ACOMPTE_MIN))
+                                    ? 'rgba(201,168,76,0.2)'
+                                    : 'rgba(255,255,255,0.03)',
+                                  border: (customAmount === String(v) || (!customAmount && v === ACOMPTE_MIN))
+                                    ? '1px solid rgba(201,168,76,0.6)'
+                                    : '1px solid rgba(201,168,76,0.2)',
+                                  borderRadius: '4px',
+                                  fontFamily: 'Jost, sans-serif',
+                                  fontSize: '12px',
+                                  color: '#C9A84C',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                }}
+                              >
                                 {v.toLocaleString()} F
                               </button>
                             ))}
                           </div>
+
+                          {/* Saisie libre */}
                           <div style={{ position: 'relative' }}>
-                            <input type="number" min={ACOMPTE_MIN} max={montantTotal - 1} step={500} value={customAmount} onChange={e => setCustomAmount(e.target.value)} placeholder={`${ACOMPTE_MIN.toLocaleString()} (minimum)`} style={{ ...inputStyle, paddingRight: '60px', fontSize: '14px' }} onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => { e.target.style.borderColor = 'rgba(201,168,76,0.25)'; const val = parseInt(customAmount); if (customAmount && (isNaN(val) || val < ACOMPTE_MIN)) { setCustomAmount(String(ACOMPTE_MIN)); } else if (!isNaN(val) && val >= montantTotal) { setCustomAmount(String(montantTotal - 500 > ACOMPTE_MIN ? montantTotal - 500 : ACOMPTE_MIN)); } }} />
-                            <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', pointerEvents: 'none' }}>FCFA</span>
+                            <input
+                              type="number"
+                              min={ACOMPTE_MIN}
+                              max={montantTotal - 1}
+                              step={500}
+                              value={customAmount}
+                              onChange={e => setCustomAmount(e.target.value)}
+                              placeholder={`${ACOMPTE_MIN.toLocaleString()} (minimum)`}
+                              style={{
+                                ...inputStyle,
+                                paddingRight: '60px',
+                                fontSize: '14px',
+                              }}
+                              onFocus={e => e.target.style.borderColor = '#C9A84C'}
+                              onBlur={e => {
+                                e.target.style.borderColor = 'rgba(201,168,76,0.25)';
+                                const val = parseInt(customAmount);
+                                if (customAmount && (isNaN(val) || val < ACOMPTE_MIN)) {
+                                  setCustomAmount(String(ACOMPTE_MIN));
+                                } else if (!isNaN(val) && val >= montantTotal) {
+                                  setCustomAmount(String(montantTotal - 500 > ACOMPTE_MIN ? montantTotal - 500 : ACOMPTE_MIN));
+                                }
+                              }}
+                            />
+                            <span style={{ position: 'absolute', right: '14px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', pointerEvents: 'none' }}>
+                              FCFA
+                            </span>
                           </div>
+
+                          {/* Indication reste */}
                           {resteAPayer > 0 && (
                             <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', margin: '10px 0 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              <span style={{ color: '#E8A44C' }}>→</span> Reste à payer le jour J : <strong style={{ color: '#FAF6EF' }}>{resteAPayer.toLocaleString()} FCFA</strong>
+                              <span style={{ color: '#E8A44C' }}>→</span>
+                              Reste à payer le jour J : <strong style={{ color: '#FAF6EF' }}>{resteAPayer.toLocaleString()} FCFA</strong>
                             </p>
                           )}
                         </div>
@@ -839,10 +766,16 @@ Merci de valider dans votre dashboard.`;
                     )}
                   </AnimatePresence>
 
-                  <motion.button onClick={() => setPaymentType('total')} whileHover={{ x: 3 }} style={{ padding: '16px 20px', background: paymentType === 'total' ? 'rgba(37,211,102,0.08)' : 'rgba(255,255,255,0.02)', border: paymentType === 'total' ? '1px solid rgba(37,211,102,0.4)' : '1px solid rgba(201,168,76,0.15)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  {/* Paiement total */}
+                  <motion.button
+                    onClick={() => setPaymentType('total')}
+                    whileHover={{ x: 3 }}
+                    style={{ padding: '16px 20px', background: paymentType === 'total' ? 'rgba(37,211,102,0.08)' : 'rgba(255,255,255,0.02)', border: paymentType === 'total' ? '1px solid rgba(37,211,102,0.4)' : '1px solid rgba(201,168,76,0.15)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
+                  >
                     <div>
                       <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#FAF6EF', fontWeight: 600, marginBottom: '4px' }}>
-                        Paiement total {paymentType === 'total' && <span style={{ marginLeft: '8px', fontSize: '10px', color: '#25D366' }}>✓ Sélectionné</span>}
+                        Paiement total
+                        {paymentType === 'total' && <span style={{ marginLeft: '8px', fontSize: '10px', color: '#25D366' }}>✓ Sélectionné</span>}
                       </div>
                       <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>Rien à payer le jour J — tout est réglé</div>
                     </div>
@@ -851,7 +784,7 @@ Merci de valider dans votre dashboard.`;
                 </div>
               </div>
 
-              {/* Summary */}
+              {/* Summary box */}
               <div style={{ padding: '16px 20px', background: 'rgba(201,168,76,0.05)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: resteAPayer > 0 ? '8px' : 0 }}>
                   <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.1em', textTransform: 'uppercase' }}>À payer maintenant</span>
@@ -871,7 +804,13 @@ Merci de valider dans votre dashboard.`;
                 </div>
               </div>
 
-              <motion.button onClick={handleCreateBooking} disabled={creatingBooking} whileHover={!creatingBooking ? { scale: 1.03, boxShadow: '0 8px 30px rgba(201,168,76,0.3)' } : {}} whileTap={!creatingBooking ? { scale: 0.97 } : {}} style={{ width: '100%', padding: '18px', background: creatingBooking ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: creatingBooking ? '#8A7968' : '#0A0A0A', border: 'none', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '13px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: creatingBooking ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
+              <motion.button
+                onClick={handleCreateBooking}
+                disabled={creatingBooking}
+                whileHover={!creatingBooking ? { scale: 1.03, boxShadow: '0 8px 30px rgba(201,168,76,0.3)' } : {}}
+                whileTap={!creatingBooking ? { scale: 0.97 } : {}}
+                style={{ width: '100%', padding: '18px', background: creatingBooking ? 'rgba(255,255,255,0.05)' : 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: creatingBooking ? '#8A7968' : '#0A0A0A', border: 'none', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '13px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: creatingBooking ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+              >
                 {creatingBooking ? 'Création en cours...' : `Réserver et payer ${montantPaye.toLocaleString()} FCFA →`}
               </motion.button>
             </div>
@@ -882,6 +821,7 @@ Merci de valider dans votre dashboard.`;
             <div>
               {!paymentSent ? (
                 <>
+                  {/* Booking ID + Countdown */}
                   <div style={{ padding: '16px 20px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '6px', marginBottom: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
                       <div>
@@ -890,12 +830,15 @@ Merci de valider dans votre dashboard.`;
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 4px' }}>Délai restant</p>
-                        {bookingData?.expirationAcompteAt && <CountdownTimer expiresAt={bookingData.expirationAcompteAt} />}
+                        {bookingData?.expirationAcompteAt && (
+                          <CountdownTimer expiresAt={bookingData.expirationAcompteAt} />
+                        )}
                       </div>
                     </div>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', margin: '10px 0 0', opacity: 0.7 }}>⚠️ Conservez ce numéro. Votre créneau sera libéré sans paiement dans le délai.</p>
                   </div>
 
+                  {/* Payment instructions */}
                   <div style={{ padding: '20px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px', marginBottom: '24px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '16px' }}>Instructions de paiement</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -913,9 +856,12 @@ Merci de valider dans votre dashboard.`;
                     </div>
                   </div>
 
+                  {/* Proof upload */}
                   <div style={{ marginBottom: '20px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '12px' }}>Preuve de paiement *</p>
-                    <div onClick={() => proofRef.current?.click()} style={{ border: proofPreview ? '1px solid rgba(201,168,76,0.5)' : '2px dashed rgba(201,168,76,0.25)', borderRadius: '6px', padding: proofPreview ? '0' : '32px', cursor: 'pointer', transition: 'all 0.3s', textAlign: 'center', overflow: 'hidden', background: 'rgba(255,255,255,0.02)' }} onMouseEnter={e => { if (!proofPreview) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.6)'; }} onMouseLeave={e => { if (!proofPreview) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.25)'; }}>
+                    <div onClick={() => proofRef.current?.click()} style={{ border: proofPreview ? '1px solid rgba(201,168,76,0.5)' : '2px dashed rgba(201,168,76,0.25)', borderRadius: '6px', padding: proofPreview ? '0' : '32px', cursor: 'pointer', transition: 'all 0.3s', textAlign: 'center', overflow: 'hidden', background: 'rgba(255,255,255,0.02)' }}
+                      onMouseEnter={e => { if (!proofPreview) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.6)'; }}
+                      onMouseLeave={e => { if (!proofPreview) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.25)'; }}>
                       <input ref={proofRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleProofChange} />
                       {proofPreview ? (
                         <div style={{ position: 'relative' }}>
@@ -982,27 +928,22 @@ Merci de valider dans votre dashboard.`;
           )}
         </motion.div>
 
-        {/* Links: cancel + modify */}
-        <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center', gap: '28px', flexWrap: 'wrap' }}>
-          <button onClick={() => { setShowCancelModal(true); setCancelStatus(null); setFoundBooking(null); setCancelBookingId(''); setRedirectCountdown(null); }} style={{ background: 'transparent', border: 'none', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(138,121,104,0.3)', opacity: 0.7 }}>
-            Annuler une réservation
-          </button>
-          <button onClick={() => { setShowModifyModal(true); setModifyStatus(null); setFoundModifyBooking(null); setModifyBookingId(''); setModifyWeekOffset(0); }} style={{ background: 'transparent', border: 'none', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(201,168,76,0.3)', opacity: 0.8, display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Edit3 size={11} /> Modifier une réservation
+        {/* Cancel/modify link */}
+        <div style={{ marginTop: '32px', textAlign: 'center' }}>
+          <button onClick={() => { setShowCancelModal(true); setCancelStatus(null); setFoundBooking(null); setCancelBookingId(''); }} style={{ background: 'transparent', border: 'none', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(138,121,104,0.3)', opacity: 0.7 }}>
+            Modifier ou annuler une réservation existante
           </button>
         </div>
       </div>
 
-      {/* ── Cancel Modal ─────────────────────────────────────────────────────────── */}
+      {/* ── Cancel Modal ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showCancelModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (!redirectCountdown) setShowCancelModal(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowCancelModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '440px', background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '8px', padding: '32px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', margin: 0 }}>Annuler une réservation</h3>
-                {!redirectCountdown && (
-                  <button onClick={() => setShowCancelModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
-                )}
+                <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', margin: 0 }}>Annuler / Modifier</h3>
+                <button onClick={() => setShowCancelModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
               </div>
 
               {(cancelStatus === null || cancelStatus === 'not_found' || cancelStatus === 'error') && (
@@ -1011,7 +952,10 @@ Merci de valider dans votre dashboard.`;
                     Entrez votre numéro de réservation (reçu lors de votre réservation).
                   </p>
                   <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '8px' }}>Numéro de réservation</label>
-                  <input value={cancelBookingId} onChange={e => setCancelBookingId(e.target.value)} placeholder="Ex: ABC123xyz..." style={{ ...inputStyle, marginBottom: '16px' }} onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = 'rgba(201,168,76,0.25)'} onKeyDown={e => e.key === 'Enter' && handleCancelLookup()} />
+                  <input value={cancelBookingId} onChange={e => setCancelBookingId(e.target.value)} placeholder="Ex: ABC123xyz..." style={{ ...inputStyle, marginBottom: '16px' }}
+                    onFocus={e => e.target.style.borderColor = '#C9A84C'}
+                    onBlur={e => e.target.style.borderColor = 'rgba(201,168,76,0.25)'}
+                    onKeyDown={e => e.key === 'Enter' && handleCancelLookup()} />
                   {cancelStatus === 'not_found' && <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E74C3C', marginBottom: '12px' }}>❌ Réservation introuvable. Vérifiez le numéro.</p>}
                   {cancelStatus === 'error' && <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E74C3C', marginBottom: '12px' }}>Erreur de connexion. Veuillez réessayer.</p>}
                   <motion.button onClick={handleCancelLookup} disabled={!cancelBookingId.trim()} whileHover={cancelBookingId.trim() ? { scale: 1.03 } : {}} style={{ width: '100%', padding: '14px', background: cancelBookingId.trim() ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'rgba(255,255,255,0.05)', color: cancelBookingId.trim() ? '#0A0A0A' : '#8A7968', border: 'none', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: cancelBookingId.trim() ? 'pointer' : 'not-allowed' }}>
@@ -1075,167 +1019,18 @@ Merci de valider dans votre dashboard.`;
                 </>
               )}
 
-              {/* ── Success states avec compte à rebours de redirection vers l'accueil ── */}
-              {(cancelStatus === 'cancelled_free' || cancelStatus === 'cancel_requested') && (
+              {cancelStatus === 'cancelled_free' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '10px 0' }}>
-                  <CheckCircle2 size={40} color={cancelStatus === 'cancelled_free' ? '#25D366' : '#E8A44C'} style={{ marginBottom: '16px' }} />
-                  <h4 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', marginBottom: '10px' }}>
-                    {cancelStatus === 'cancelled_free' ? 'Réservation annulée' : 'Demande envoyée'}
-                  </h4>
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.6, marginBottom: '20px' }}>
-                    {cancelStatus === 'cancelled_free'
-                      ? 'Votre réservation a été annulée et le créneau a été libéré.'
-                      : 'Votre demande d\'annulation a été transmise à Mamifa. Vous serez contacté pour confirmer.'}
-                  </p>
-                  {redirectCountdown !== null && (
-                    <div style={{ padding: '14px 18px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px' }}>
-                      <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', margin: '0 0 8px' }}>
-                        Redirection vers l'accueil dans <strong style={{ fontSize: '16px' }}>{redirectCountdown}s</strong>
-                      </p>
-                      {/* Barre de progression */}
-                      <div style={{ height: '3px', background: 'rgba(201,168,76,0.15)', borderRadius: '2px', overflow: 'hidden' }}>
-                        <motion.div
-                          initial={{ width: '100%' }}
-                          animate={{ width: `${(redirectCountdown / 5) * 100}%` }}
-                          transition={{ duration: 1, ease: 'linear' }}
-                          style={{ height: '100%', background: 'linear-gradient(90deg, #C9A84C, #E8C97A)', borderRadius: '2px' }}
-                        />
-                      </div>
-                    </div>
-                  )}
+                  <CheckCircle2 size={40} color="#25D366" style={{ marginBottom: '16px' }} />
+                  <h4 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', marginBottom: '10px' }}>Réservation annulée</h4>
+                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.6 }}>Votre réservation a été annulée et le créneau a été libéré.</p>
                 </motion.div>
               )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Modify Modal ─────────────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {showModifyModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModifyModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px', overflowY: 'auto' }}>
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '8px', padding: '32px', maxHeight: '90vh', overflowY: 'auto', margin: 'auto' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Edit3 size={15} color="#C9A84C" />
-                  <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', margin: 0 }}>Modifier une réservation</h3>
-                </div>
-                <button onClick={() => setShowModifyModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
-              </div>
-
-              {/* Lookup */}
-              {(modifyStatus === null || modifyStatus === 'not_found' || modifyStatus === 'error' || modifyStatus === 'no_changes') && (
-                <>
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', marginBottom: '20px', lineHeight: 1.6 }}>
-                    Entrez votre numéro de réservation pour modifier votre créneau, jour ou service.
-                  </p>
-                  <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '8px' }}>Numéro de réservation</label>
-                  <input value={modifyBookingId} onChange={e => setModifyBookingId(e.target.value)} placeholder="Ex: ABC123xyz..." style={{ ...inputStyle, marginBottom: '16px' }} onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = 'rgba(201,168,76,0.25)'} onKeyDown={e => e.key === 'Enter' && handleModifyLookup()} />
-                  {modifyStatus === 'not_found' && <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E74C3C', marginBottom: '12px' }}>❌ Réservation introuvable. Vérifiez le numéro.</p>}
-                  {modifyStatus === 'error' && <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E74C3C', marginBottom: '12px' }}>Erreur de connexion. Veuillez réessayer.</p>}
-                  {modifyStatus === 'no_changes' && <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E8A44C', marginBottom: '12px' }}>⚠️ Aucune modification détectée.</p>}
-                  <motion.button onClick={handleModifyLookup} disabled={!modifyBookingId.trim()} whileHover={modifyBookingId.trim() ? { scale: 1.03 } : {}} style={{ width: '100%', padding: '14px', background: modifyBookingId.trim() ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'rgba(255,255,255,0.05)', color: modifyBookingId.trim() ? '#0A0A0A' : '#8A7968', border: 'none', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: modifyBookingId.trim() ? 'pointer' : 'not-allowed' }}>
-                    Rechercher
-                  </motion.button>
-                </>
-              )}
-
-              {modifyStatus === 'loading' && (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: '32px', height: '32px', border: '2px solid rgba(201,168,76,0.2)', borderTopColor: '#C9A84C', borderRadius: '50%', margin: '0 auto 12px' }} />
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968' }}>Chargement...</p>
-                </div>
-              )}
-
-              {modifyStatus === 'found' && foundModifyBooking && (
-                <>
-                  <div style={{ padding: '14px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '4px', marginBottom: '20px' }}>
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '8px' }}>Réservation actuelle</p>
-                    <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#FAF6EF' }}>{foundModifyBooking.name} — {foundModifyBooking.service}</div>
-                    <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Calendar size={10} /> {foundModifyBooking.date} à {foundModifyBooking.time}
-                    </div>
-                  </div>
-
-                  {/* Service */}
-                  <div style={{ marginBottom: '18px' }}>
-                    <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '10px' }}>Nouveau service</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {SERVICES.map(s => (
-                        <button key={s.id} onClick={() => setModifyForm(f => ({ ...f, service: s.label }))} style={{ padding: '10px 14px', background: modifyForm.service === s.label ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.02)', border: modifyForm.service === s.label ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(201,168,76,0.12)', borderRadius: '4px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', transition: 'all 0.2s' }}>
-                          <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: modifyForm.service === s.label ? '#FAF6EF' : '#8A7968' }}>{s.label}</span>
-                          <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '13px', color: '#C9A84C' }}>{s.price}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Date */}
-                  <div style={{ marginBottom: '18px' }}>
-                    <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '10px' }}>Nouvelle date</label>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <button onClick={() => setModifyWeekOffset(Math.max(0, modifyWeekOffset - 1))} disabled={modifyWeekOffset === 0} style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: modifyWeekOffset === 0 ? 'not-allowed' : 'pointer', opacity: modifyWeekOffset === 0 ? 0.3 : 1 }}>
-                        <ChevronLeft size={13} color="#C9A84C" />
-                      </button>
-                      <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', letterSpacing: '0.08em' }}>
-                        {format(modifyVisibleDays[0], 'd MMM', { locale: fr })} — {format(modifyVisibleDays[6], 'd MMM', { locale: fr })}
-                      </span>
-                      <button onClick={() => setModifyWeekOffset(Math.min(3, modifyWeekOffset + 1))} disabled={modifyWeekOffset >= 3} style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: modifyWeekOffset >= 3 ? 'not-allowed' : 'pointer', opacity: modifyWeekOffset >= 3 ? 0.3 : 1 }}>
-                        <ChevronRight size={13} color="#C9A84C" />
-                      </button>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-                      {modifyVisibleDays.map(date => {
-                        const ds = format(date, 'yyyy-MM-dd');
-                        const avail = !!availability[ds] && (availability[ds] || []).length > 0;
-                        const sel = modifyForm.date === ds;
-                        return (
-                          <button key={ds} disabled={!avail} onClick={() => setModifyForm(f => ({ ...f, date: ds, time: '' }))} style={{ padding: '6px 2px', background: sel ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : avail ? 'rgba(201,168,76,0.08)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid #C9A84C' : avail ? '1px solid rgba(201,168,76,0.4)' : '1px solid rgba(255,255,255,0.04)', borderRadius: '4px', cursor: avail ? 'pointer' : 'not-allowed', opacity: avail ? 1 : 0.3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', transition: 'all 0.2s' }}>
-                            <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: sel ? '#0A0A0A' : '#8A7968', textTransform: 'uppercase' }}>{format(date, 'EEE', { locale: fr })}</span>
-                            <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '16px', color: sel ? '#0A0A0A' : avail ? '#C9A84C' : '#555', lineHeight: 1 }}>{format(date, 'd')}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Heure */}
-                  {modifyForm.date && (
-                    <div style={{ marginBottom: '18px' }}>
-                      <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '10px' }}>Nouvel horaire</label>
-                      {modifyAvailSlots.length === 0 ? (
-                        <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968', fontStyle: 'italic' }}>Aucun créneau disponible ce jour.</p>
-                      ) : (
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          {modifyAvailSlots.map(t => (
-                            <button key={t} onClick={() => setModifyForm(f => ({ ...f, time: t }))} style={{ padding: '8px 13px', background: modifyForm.time === t ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'transparent', border: modifyForm.time === t ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.3)', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '12px', color: modifyForm.time === t ? '#0A0A0A' : '#FAF6EF', cursor: 'pointer', transition: 'all 0.2s' }}>
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-                    <button onClick={() => { setModifyStatus(null); setFoundModifyBooking(null); setModifyBookingId(''); }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid rgba(201,168,76,0.2)', color: '#8A7968', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer' }}>Retour</button>
-                    <motion.button onClick={handleConfirmModify} whileHover={{ scale: 1.03 }} style={{ flex: 2, padding: '12px', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0A0A0A', border: 'none', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <Edit3 size={12} /> Envoyer la demande
-                    </motion.button>
-                  </div>
-                </>
-              )}
-
-              {modifyStatus === 'modified' && (
+              {cancelStatus === 'cancel_requested' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '10px 0' }}>
-                  <CheckCircle2 size={40} color="#C9A84C" style={{ marginBottom: '16px' }} />
+                  <CheckCircle2 size={40} color="#E8A44C" style={{ marginBottom: '16px' }} />
                   <h4 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', marginBottom: '10px' }}>Demande envoyée</h4>
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.6, marginBottom: '20px' }}>
-                    Votre demande de modification a été transmise à Mamifa. Elle vous confirmera les changements par WhatsApp.
-                  </p>
-                  <button onClick={() => setShowModifyModal(false)} style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0A0A0A', border: 'none', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: 'pointer' }}>
-                    Fermer
-                  </button>
+                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.6 }}>Votre demande d'annulation a été transmise à Mamifa via WhatsApp. Vous serez contacté pour confirmer.</p>
                 </motion.div>
               )}
             </motion.div>

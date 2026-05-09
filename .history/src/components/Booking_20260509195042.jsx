@@ -194,21 +194,6 @@ function CountdownTimer({ expiresAt }) {
   );
 }
 
-// ─── Helper : réinitialiser le formulaire complet ─────────────────────────────
-function getEmptyForm() {
-  return {
-    selectedService: null,
-    selectedDate: null,
-    selectedTime: null,
-    name: '',
-    phone: '',
-    paymentType: 'acompte',
-    customAmount: '',
-    weekOffset: 0,
-    step: 1,
-  };
-}
-
 // ─── Main Booking Component ───────────────────────────────────────────────────
 export default function Booking() {
   const [step, setStep] = useState(1);
@@ -276,19 +261,15 @@ export default function Booking() {
     return shortcuts.filter(v => v >= ACOMPTE_MIN && v < montantTotal);
   };
 
-  // ── Redirect après annulation — vers l'accueil ─────────────────────────────
+  // ── Redirect après annulation ──────────────────────────────────────────────
   useEffect(() => {
     if (redirectCountdown === null) return;
     if (redirectCountdown <= 0) {
       setShowCancelModal(false);
       setRedirectCountdown(null);
-      // Scroll vers la section accueil ou haut de page
-      const accueil = document.getElementById('accueil');
-      if (accueil) {
-        accueil.scrollIntoView({ behavior: 'smooth' });
-      } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      const heroSection = document.getElementById('accueil') || document.body;
+      heroSection.scrollIntoView({ behavior: 'smooth' });
       return;
     }
     const timer = setTimeout(() => setRedirectCountdown(c => c - 1), 1000);
@@ -327,12 +308,10 @@ export default function Booking() {
     setModifyAvailSlots(slots);
   }, [modifyForm.date, availability]);
 
-  // ── Changement de service : réinitialisation COMPLÈTE ─────────────────────
-  // Si l'utilisateur sélectionne un service différent de celui en cours,
-  // on réinitialise tout le formulaire et on revient à l'étape 1.
+  // ── Quand on change de service : réinitialiser tout et revenir étape 1 ──────
   const handleSelectService = (serviceId) => {
     if (selectedService !== null && selectedService !== serviceId) {
-      // Réinitialisation totale
+      // Réinitialisation COMPLÈTE du formulaire
       setSelectedDate(null);
       setSelectedTime(null);
       setName('');
@@ -340,12 +319,6 @@ export default function Booking() {
       setPaymentType('acompte');
       setCustomAmount('');
       setWeekOffset(0);
-      setBookingId(null);
-      setBookingData(null);
-      setProofFile(null);
-      setProofPreview(null);
-      setPaymentSent(false);
-      setCreatingBooking(false);
       setStep(1);
     }
     setSelectedService(serviceId);
@@ -416,7 +389,7 @@ export default function Booking() {
         expirationAcompteAt,
       });
 
-      // ✅ Notification WhatsApp ADMIN uniquement — nouvelle réservation
+      // ✅ Notification WhatsApp ADMIN uniquement (pas au client)
       const adminMsg =
 `📅 *MAGICAL HAND — Nouvelle réservation*
 ━━━━━━━━━━━━━━━━━━━
@@ -431,8 +404,7 @@ Statut : En attente d'acompte ⏳
 N° réservation : ${docRef.id}`;
       notifyAdminWhatsApp(adminMsg);
 
-      
-      // (WhatsApp s'ouvre déjà avec un message admin prérempli)
+      // ❌ PAS de message WhatsApp au client ici — il sera contacté après paiement
 
       setStep(5);
     } catch (err) {
@@ -545,15 +517,14 @@ N° réservation : ${docRef.id}`;
 `❌ *MAGICAL HAND — Réservation annulée*
 ━━━━━━━━━━━━━━━━━━━
 👤 Cliente : ${foundBooking.name}${foundBooking.phone ? `\n📱 ${foundBooking.phone}` : ''}
-💋Type de maquillage: ${foundBooking.service}
-📅Date: ${foundBooking.date} à ${foundBooking.time}
+💋 ${foundBooking.service}
+📅 ${foundBooking.date} à ${foundBooking.time}
 ━━━━━━━━━━━━━━━━━━━
 ${isFreeCancel ? 'Annulation libre — créneau automatiquement libéré.' : 'Le client demande l\'annulation de son RDV confirmé.\nMerci de traiter la demande dans le dashboard.'}`;
         notifyAdminWhatsApp(adminMsg);
       }
 
       setCancelStatus(isFreeCancel ? 'cancelled_free' : 'cancel_requested');
-      // Démarrer le compte à rebours de redirection (5 secondes)
       setRedirectCountdown(5);
     } catch { setCancelStatus('error'); }
   };
@@ -607,12 +578,12 @@ ${isFreeCancel ? 'Annulation libre — créneau automatiquement libéré.' : 'Le
 `✏️ *MAGICAL HAND — Demande de modification*
 ━━━━━━━━━━━━━━━━━━━
 👤 Cliente : ${b.name}${b.phone ? `\n📱 ${b.phone}` : ''}
-N°réservation : ${b.id}
+N° : ${b.id}
 ━━━━━━━━━━━━━━━━━━━
 Modifications demandées :
 ${changeLines}
 ━━━━━━━━━━━━━━━━━━━
-Merci de valider dans votre dashboard.`;
+Merci de valider dans le dashboard.`;
       notifyAdminWhatsApp(adminMsg);
 
       setModifyStatus('modified');
@@ -648,8 +619,7 @@ Merci de valider dans votre dashboard.`;
         </h2>
         <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg, transparent, #C9A84C, transparent)', margin: '0 auto 24px' }} />
         <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '14px', color: '#8A7968', maxWidth: '440px', margin: '0 auto' }}>
-          Choisissez votre prestation, votre date, et sécurisez votre réservation avec un acompte(obligatoire) minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
-          
+          Choisissez votre prestation, votre date, et sécurisez votre créneau avec un acompte minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
         </p>
       </motion.div>
 
@@ -996,13 +966,11 @@ Merci de valider dans votre dashboard.`;
       {/* ── Cancel Modal ─────────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showCancelModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (!redirectCountdown) setShowCancelModal(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowCancelModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '440px', background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '8px', padding: '32px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
                 <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', margin: 0 }}>Annuler une réservation</h3>
-                {!redirectCountdown && (
-                  <button onClick={() => setShowCancelModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
-                )}
+                <button onClick={() => setShowCancelModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
               </div>
 
               {(cancelStatus === null || cancelStatus === 'not_found' || cancelStatus === 'error') && (
@@ -1075,7 +1043,7 @@ Merci de valider dans votre dashboard.`;
                 </>
               )}
 
-              {/* ── Success states avec compte à rebours de redirection vers l'accueil ── */}
+              {/* Success states avec compte à rebours de redirection */}
               {(cancelStatus === 'cancelled_free' || cancelStatus === 'cancel_requested') && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '10px 0' }}>
                   <CheckCircle2 size={40} color={cancelStatus === 'cancelled_free' ? '#25D366' : '#E8A44C'} style={{ marginBottom: '16px' }} />
@@ -1088,19 +1056,10 @@ Merci de valider dans votre dashboard.`;
                       : 'Votre demande d\'annulation a été transmise à Mamifa. Vous serez contacté pour confirmer.'}
                   </p>
                   {redirectCountdown !== null && (
-                    <div style={{ padding: '14px 18px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px' }}>
-                      <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', margin: '0 0 8px' }}>
-                        Redirection vers l'accueil dans <strong style={{ fontSize: '16px' }}>{redirectCountdown}s</strong>
+                    <div style={{ padding: '12px 16px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '4px' }}>
+                      <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', margin: 0 }}>
+                        Redirection vers l'accueil dans <strong>{redirectCountdown}s</strong>...
                       </p>
-                      {/* Barre de progression */}
-                      <div style={{ height: '3px', background: 'rgba(201,168,76,0.15)', borderRadius: '2px', overflow: 'hidden' }}>
-                        <motion.div
-                          initial={{ width: '100%' }}
-                          animate={{ width: `${(redirectCountdown / 5) * 100}%` }}
-                          transition={{ duration: 1, ease: 'linear' }}
-                          style={{ height: '100%', background: 'linear-gradient(90deg, #C9A84C, #E8C97A)', borderRadius: '2px' }}
-                        />
-                      </div>
                     </div>
                   )}
                 </motion.div>
@@ -1149,6 +1108,7 @@ Merci de valider dans votre dashboard.`;
 
               {modifyStatus === 'found' && foundModifyBooking && (
                 <>
+                  {/* Récap actuel */}
                   <div style={{ padding: '14px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '4px', marginBottom: '20px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '8px' }}>Réservation actuelle</p>
                     <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#FAF6EF' }}>{foundModifyBooking.name} — {foundModifyBooking.service}</div>

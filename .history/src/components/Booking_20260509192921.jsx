@@ -10,7 +10,7 @@ import { fr } from 'date-fns/locale';
 import {
   Sparkles, Camera, Crown, Clock, ChevronLeft, ChevronRight,
   MessageCircle, CreditCard, Check, Wand2, Upload, AlertCircle,
-  CheckCircle2, XCircle, ArrowRight, Images, Edit3, Calendar
+  CheckCircle2, XCircle, ArrowRight, Images
 } from 'lucide-react';
 import { uploadImage } from '../utils/uploadImage';
 
@@ -194,21 +194,6 @@ function CountdownTimer({ expiresAt }) {
   );
 }
 
-// ─── Helper : réinitialiser le formulaire complet ─────────────────────────────
-function getEmptyForm() {
-  return {
-    selectedService: null,
-    selectedDate: null,
-    selectedTime: null,
-    name: '',
-    phone: '',
-    paymentType: 'acompte',
-    customAmount: '',
-    weekOffset: 0,
-    step: 1,
-  };
-}
-
 // ─── Main Booking Component ───────────────────────────────────────────────────
 export default function Booking() {
   const [step, setStep] = useState(1);
@@ -233,15 +218,6 @@ export default function Booking() {
   const [uploading, setUploading] = useState(false);
   const [paymentSent, setPaymentSent] = useState(false);
   const [creatingBooking, setCreatingBooking] = useState(false);
-
-  // Modification
-  const [showModifyModal, setShowModifyModal] = useState(false);
-  const [modifyBookingId, setModifyBookingId] = useState('');
-  const [modifyStatus, setModifyStatus] = useState(null);
-  const [foundModifyBooking, setFoundModifyBooking] = useState(null);
-  const [modifyForm, setModifyForm] = useState({ service: '', date: '', time: '' });
-  const [modifyWeekOffset, setModifyWeekOffset] = useState(0);
-  const [modifyAvailSlots, setModifyAvailSlots] = useState([]);
 
   // Cancellation
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -276,19 +252,18 @@ export default function Booking() {
     return shortcuts.filter(v => v >= ACOMPTE_MIN && v < montantTotal);
   };
 
-  // ── Redirect après annulation — vers l'accueil ─────────────────────────────
+  // ── Redirect après annulation ──────────────────────────────────────────────
   useEffect(() => {
     if (redirectCountdown === null) return;
     if (redirectCountdown <= 0) {
+      // Fermer modal + rediriger vers accueil
       setShowCancelModal(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Si vous utilisez React Router : navigate('/');
+      // Sinon on scrolle simplement vers le haut de la page
+      const heroSection = document.getElementById('accueil') || document.body;
+      heroSection.scrollIntoView({ behavior: 'smooth' });
       setRedirectCountdown(null);
-      // Scroll vers la section accueil ou haut de page
-      const accueil = document.getElementById('accueil');
-      if (accueil) {
-        accueil.scrollIntoView({ behavior: 'smooth' });
-      } else {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
       return;
     }
     const timer = setTimeout(() => setRedirectCountdown(c => c - 1), 1000);
@@ -320,19 +295,11 @@ export default function Booking() {
     return unsub;
   }, [selectedDate]);
 
-  // ── Charger les créneaux pour la modification ──────────────────────────────
-  useEffect(() => {
-    if (!modifyForm.date) { setModifyAvailSlots([]); return; }
-    const slots = availability[modifyForm.date] || [];
-    setModifyAvailSlots(slots);
-  }, [modifyForm.date, availability]);
-
-  // ── Changement de service : réinitialisation COMPLÈTE ─────────────────────
-  // Si l'utilisateur sélectionne un service différent de celui en cours,
-  // on réinitialise tout le formulaire et on revient à l'étape 1.
+  // ── Quand on change de service, revenir à l'étape 1 si on était plus loin ─
   const handleSelectService = (serviceId) => {
-    if (selectedService !== null && selectedService !== serviceId) {
-      // Réinitialisation totale
+    if (selectedService !== null && selectedService !== serviceId && step > 1) {
+      // Réinitialiser tout et revenir à l'étape 1
+      setSelectedService(serviceId);
       setSelectedDate(null);
       setSelectedTime(null);
       setName('');
@@ -340,15 +307,10 @@ export default function Booking() {
       setPaymentType('acompte');
       setCustomAmount('');
       setWeekOffset(0);
-      setBookingId(null);
-      setBookingData(null);
-      setProofFile(null);
-      setProofPreview(null);
-      setPaymentSent(false);
-      setCreatingBooking(false);
       setStep(1);
+    } else {
+      setSelectedService(serviceId);
     }
-    setSelectedService(serviceId);
   };
 
   const isDateAvailable = (date) => {
@@ -403,6 +365,7 @@ export default function Booking() {
         dateReservation: serverTimestamp(),
         createdAt: serverTimestamp(),
         proofUrl: null,
+        // Tracking notifications
         adminNotifiedNewBooking: false,
       });
 
@@ -416,7 +379,7 @@ export default function Booking() {
         expirationAcompteAt,
       });
 
-      // ✅ Notification WhatsApp ADMIN uniquement — nouvelle réservation
+      // ✅ Notification WhatsApp admin uniquement (pas au client)
       const adminMsg =
 `📅 *MAGICAL HAND — Nouvelle réservation*
 ━━━━━━━━━━━━━━━━━━━
@@ -430,9 +393,6 @@ export default function Booking() {
 Statut : En attente d'acompte ⏳
 N° réservation : ${docRef.id}`;
       notifyAdminWhatsApp(adminMsg);
-
-      
-      // (WhatsApp s'ouvre déjà avec un message admin prérempli)
 
       setStep(5);
     } catch (err) {
@@ -484,7 +444,7 @@ N° réservation : ${docRef.id}`;
         : `✅ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
       notifyAdminWhatsApp(adminMsg);
 
-      // ✅ Notification client WhatsApp — uniquement après paiement réel
+      // ✅ Notification client WhatsApp (confirmation seulement)
       const clientMsg = isPaidFull
         ? `✔️ *Paiement complet reçu*\nMerci *${name}*, votre rendez-vous est entièrement réglé.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`
         : `✔️ *Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`;
@@ -538,85 +498,21 @@ N° réservation : ${docRef.id}`;
         }
       }
 
-      // ✅ Notification admin WhatsApp annulation — uniquement si acompte versé
-      const hadPayment = (foundBooking.montantPaye || 0) > 0;
-      if (!isFreeCancel || hadPayment) {
-        const adminMsg =
+      // ✅ Notification admin WhatsApp annulation
+      const adminMsg =
 `❌ *MAGICAL HAND — Réservation annulée*
 ━━━━━━━━━━━━━━━━━━━
 👤 Cliente : ${foundBooking.name}${foundBooking.phone ? `\n📱 ${foundBooking.phone}` : ''}
-💋Type de maquillage: ${foundBooking.service}
-📅Date: ${foundBooking.date} à ${foundBooking.time}
+💋 ${foundBooking.service}
+📅 ${foundBooking.date} à ${foundBooking.time}
 ━━━━━━━━━━━━━━━━━━━
 ${isFreeCancel ? 'Annulation libre — créneau automatiquement libéré.' : 'Le client demande l\'annulation de son RDV confirmé.\nMerci de traiter la demande dans le dashboard.'}`;
-        notifyAdminWhatsApp(adminMsg);
-      }
+      notifyAdminWhatsApp(adminMsg);
 
       setCancelStatus(isFreeCancel ? 'cancelled_free' : 'cancel_requested');
       // Démarrer le compte à rebours de redirection (5 secondes)
       setRedirectCountdown(5);
     } catch { setCancelStatus('error'); }
-  };
-
-  // ── Modification lookup ──────────────────────────────────────────────────
-  const handleModifyLookup = async () => {
-    if (!modifyBookingId.trim()) return;
-    setModifyStatus('loading');
-    setFoundModifyBooking(null);
-    try {
-      const snap = await getDoc(doc(db, 'bookings', modifyBookingId.trim()));
-      if (!snap.exists()) { setModifyStatus('not_found'); return; }
-      const data = { id: snap.id, ...snap.data() };
-      setFoundModifyBooking(data);
-      setModifyForm({
-        service: data.service || '',
-        date: data.date || '',
-        time: data.time || '',
-      });
-      setModifyStatus('found');
-    } catch { setModifyStatus('error'); }
-  };
-
-  const handleConfirmModify = async () => {
-    if (!foundModifyBooking) return;
-    setModifyStatus('loading');
-    try {
-      const b = foundModifyBooking;
-      const changes = {};
-      if (modifyForm.service !== b.service) changes['Service'] = `${b.service} → ${modifyForm.service}`;
-      if (modifyForm.date !== b.date) changes['Date'] = `${b.date} → ${modifyForm.date}`;
-      if (modifyForm.time !== b.time) changes['Heure'] = `${b.time} → ${modifyForm.time}`;
-
-      if (Object.keys(changes).length === 0) {
-        setModifyStatus('no_changes');
-        return;
-      }
-
-      await updateDoc(doc(db, 'bookings', b.id), {
-        service: modifyForm.service,
-        date: modifyForm.date,
-        time: modifyForm.time,
-        modificationRequestedAt: serverTimestamp(),
-        statutReservation: 'modification_demandee',
-        status: 'modification_demandee',
-      });
-
-      // ✅ Notification admin WhatsApp modification
-      const changeLines = Object.entries(changes).map(([k, v]) => `• ${k} : ${v}`).join('\n');
-      const adminMsg =
-`✏️ *MAGICAL HAND — Demande de modification*
-━━━━━━━━━━━━━━━━━━━
-👤 Cliente : ${b.name}${b.phone ? `\n📱 ${b.phone}` : ''}
-N°réservation : ${b.id}
-━━━━━━━━━━━━━━━━━━━
-Modifications demandées :
-${changeLines}
-━━━━━━━━━━━━━━━━━━━
-Merci de valider dans votre dashboard.`;
-      notifyAdminWhatsApp(adminMsg);
-
-      setModifyStatus('modified');
-    } catch { setModifyStatus('error'); }
   };
 
   const canProceed = () => {
@@ -633,11 +529,6 @@ Merci de valider dans votre dashboard.`;
     transition: 'border 0.3s', boxSizing: 'border-box',
   };
 
-  // Jours visibles pour la modification
-  const modifyVisibleDays = Array.from({ length: 7 }, (_, i) =>
-    addDays(new Date(), modifyWeekOffset * 7 + i + 1)
-  );
-
   return (
     <section id="reserver" className="booking-section">
       {/* Header */}
@@ -648,8 +539,7 @@ Merci de valider dans votre dashboard.`;
         </h2>
         <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg, transparent, #C9A84C, transparent)', margin: '0 auto 24px' }} />
         <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '14px', color: '#8A7968', maxWidth: '440px', margin: '0 auto' }}>
-          Choisissez votre prestation, votre date, et sécurisez votre réservation avec un acompte(obligatoire) minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
-          
+          Choisissez votre prestation, votre date, et sécurisez votre créneau avec un acompte minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
         </p>
       </motion.div>
 
@@ -982,13 +872,10 @@ Merci de valider dans votre dashboard.`;
           )}
         </motion.div>
 
-        {/* Links: cancel + modify */}
-        <div style={{ marginTop: '32px', display: 'flex', justifyContent: 'center', gap: '28px', flexWrap: 'wrap' }}>
+        {/* Cancel link */}
+        <div style={{ marginTop: '32px', textAlign: 'center' }}>
           <button onClick={() => { setShowCancelModal(true); setCancelStatus(null); setFoundBooking(null); setCancelBookingId(''); setRedirectCountdown(null); }} style={{ background: 'transparent', border: 'none', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(138,121,104,0.3)', opacity: 0.7 }}>
-            Annuler une réservation
-          </button>
-          <button onClick={() => { setShowModifyModal(true); setModifyStatus(null); setFoundModifyBooking(null); setModifyBookingId(''); setModifyWeekOffset(0); }} style={{ background: 'transparent', border: 'none', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', textDecoration: 'underline', textDecorationColor: 'rgba(201,168,76,0.3)', opacity: 0.8, display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Edit3 size={11} /> Modifier une réservation
+            Annuler une réservation existante
           </button>
         </div>
       </div>
@@ -996,13 +883,11 @@ Merci de valider dans votre dashboard.`;
       {/* ── Cancel Modal ─────────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showCancelModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { if (!redirectCountdown) setShowCancelModal(false); }} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowCancelModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
             <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '440px', background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '8px', padding: '32px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', margin: 0 }}>Annuler une réservation</h3>
-                {!redirectCountdown && (
-                  <button onClick={() => setShowCancelModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
-                )}
+                <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', margin: 0 }}>Annuler / Modifier</h3>
+                <button onClick={() => setShowCancelModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
               </div>
 
               {(cancelStatus === null || cancelStatus === 'not_found' || cancelStatus === 'error') && (
@@ -1075,7 +960,7 @@ Merci de valider dans votre dashboard.`;
                 </>
               )}
 
-              {/* ── Success states avec compte à rebours de redirection vers l'accueil ── */}
+              {/* ── Success states avec compte à rebours de redirection ── */}
               {(cancelStatus === 'cancelled_free' || cancelStatus === 'cancel_requested') && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '10px 0' }}>
                   <CheckCircle2 size={40} color={cancelStatus === 'cancelled_free' ? '#25D366' : '#E8A44C'} style={{ marginBottom: '16px' }} />
@@ -1085,157 +970,15 @@ Merci de valider dans votre dashboard.`;
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.6, marginBottom: '20px' }}>
                     {cancelStatus === 'cancelled_free'
                       ? 'Votre réservation a été annulée et le créneau a été libéré.'
-                      : 'Votre demande d\'annulation a été transmise à Mamifa. Vous serez contacté pour confirmer.'}
+                      : 'Votre demande d\'annulation a été transmise à Mamifa via WhatsApp. Vous serez contacté pour confirmer.'}
                   </p>
                   {redirectCountdown !== null && (
-                    <div style={{ padding: '14px 18px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px' }}>
-                      <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', margin: '0 0 8px' }}>
-                        Redirection vers l'accueil dans <strong style={{ fontSize: '16px' }}>{redirectCountdown}s</strong>
+                    <div style={{ padding: '12px 16px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '4px' }}>
+                      <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', margin: 0 }}>
+                        Redirection vers l'accueil dans <strong>{redirectCountdown}s</strong>...
                       </p>
-                      {/* Barre de progression */}
-                      <div style={{ height: '3px', background: 'rgba(201,168,76,0.15)', borderRadius: '2px', overflow: 'hidden' }}>
-                        <motion.div
-                          initial={{ width: '100%' }}
-                          animate={{ width: `${(redirectCountdown / 5) * 100}%` }}
-                          transition={{ duration: 1, ease: 'linear' }}
-                          style={{ height: '100%', background: 'linear-gradient(90deg, #C9A84C, #E8C97A)', borderRadius: '2px' }}
-                        />
-                      </div>
                     </div>
                   )}
-                </motion.div>
-              )}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ── Modify Modal ─────────────────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {showModifyModal && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModifyModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px', overflowY: 'auto' }}>
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9 }} onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: '480px', background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '8px', padding: '32px', maxHeight: '90vh', overflowY: 'auto', margin: 'auto' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Edit3 size={15} color="#C9A84C" />
-                  <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', margin: 0 }}>Modifier une réservation</h3>
-                </div>
-                <button onClick={() => setShowModifyModal(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#8A7968', fontSize: '20px', lineHeight: 1 }}>×</button>
-              </div>
-
-              {/* Lookup */}
-              {(modifyStatus === null || modifyStatus === 'not_found' || modifyStatus === 'error' || modifyStatus === 'no_changes') && (
-                <>
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', marginBottom: '20px', lineHeight: 1.6 }}>
-                    Entrez votre numéro de réservation pour modifier votre créneau, jour ou service.
-                  </p>
-                  <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '8px' }}>Numéro de réservation</label>
-                  <input value={modifyBookingId} onChange={e => setModifyBookingId(e.target.value)} placeholder="Ex: ABC123xyz..." style={{ ...inputStyle, marginBottom: '16px' }} onFocus={e => e.target.style.borderColor = '#C9A84C'} onBlur={e => e.target.style.borderColor = 'rgba(201,168,76,0.25)'} onKeyDown={e => e.key === 'Enter' && handleModifyLookup()} />
-                  {modifyStatus === 'not_found' && <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E74C3C', marginBottom: '12px' }}>❌ Réservation introuvable. Vérifiez le numéro.</p>}
-                  {modifyStatus === 'error' && <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E74C3C', marginBottom: '12px' }}>Erreur de connexion. Veuillez réessayer.</p>}
-                  {modifyStatus === 'no_changes' && <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E8A44C', marginBottom: '12px' }}>⚠️ Aucune modification détectée.</p>}
-                  <motion.button onClick={handleModifyLookup} disabled={!modifyBookingId.trim()} whileHover={modifyBookingId.trim() ? { scale: 1.03 } : {}} style={{ width: '100%', padding: '14px', background: modifyBookingId.trim() ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'rgba(255,255,255,0.05)', color: modifyBookingId.trim() ? '#0A0A0A' : '#8A7968', border: 'none', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: modifyBookingId.trim() ? 'pointer' : 'not-allowed' }}>
-                    Rechercher
-                  </motion.button>
-                </>
-              )}
-
-              {modifyStatus === 'loading' && (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: '32px', height: '32px', border: '2px solid rgba(201,168,76,0.2)', borderTopColor: '#C9A84C', borderRadius: '50%', margin: '0 auto 12px' }} />
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968' }}>Chargement...</p>
-                </div>
-              )}
-
-              {modifyStatus === 'found' && foundModifyBooking && (
-                <>
-                  <div style={{ padding: '14px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '4px', marginBottom: '20px' }}>
-                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '8px' }}>Réservation actuelle</p>
-                    <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#FAF6EF' }}>{foundModifyBooking.name} — {foundModifyBooking.service}</div>
-                    <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                      <Calendar size={10} /> {foundModifyBooking.date} à {foundModifyBooking.time}
-                    </div>
-                  </div>
-
-                  {/* Service */}
-                  <div style={{ marginBottom: '18px' }}>
-                    <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '10px' }}>Nouveau service</label>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {SERVICES.map(s => (
-                        <button key={s.id} onClick={() => setModifyForm(f => ({ ...f, service: s.label }))} style={{ padding: '10px 14px', background: modifyForm.service === s.label ? 'rgba(201,168,76,0.12)' : 'rgba(255,255,255,0.02)', border: modifyForm.service === s.label ? '1px solid rgba(201,168,76,0.6)' : '1px solid rgba(201,168,76,0.12)', borderRadius: '4px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', transition: 'all 0.2s' }}>
-                          <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: modifyForm.service === s.label ? '#FAF6EF' : '#8A7968' }}>{s.label}</span>
-                          <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '13px', color: '#C9A84C' }}>{s.price}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Date */}
-                  <div style={{ marginBottom: '18px' }}>
-                    <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '10px' }}>Nouvelle date</label>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <button onClick={() => setModifyWeekOffset(Math.max(0, modifyWeekOffset - 1))} disabled={modifyWeekOffset === 0} style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: modifyWeekOffset === 0 ? 'not-allowed' : 'pointer', opacity: modifyWeekOffset === 0 ? 0.3 : 1 }}>
-                        <ChevronLeft size={13} color="#C9A84C" />
-                      </button>
-                      <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', letterSpacing: '0.08em' }}>
-                        {format(modifyVisibleDays[0], 'd MMM', { locale: fr })} — {format(modifyVisibleDays[6], 'd MMM', { locale: fr })}
-                      </span>
-                      <button onClick={() => setModifyWeekOffset(Math.min(3, modifyWeekOffset + 1))} disabled={modifyWeekOffset >= 3} style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: modifyWeekOffset >= 3 ? 'not-allowed' : 'pointer', opacity: modifyWeekOffset >= 3 ? 0.3 : 1 }}>
-                        <ChevronRight size={13} color="#C9A84C" />
-                      </button>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
-                      {modifyVisibleDays.map(date => {
-                        const ds = format(date, 'yyyy-MM-dd');
-                        const avail = !!availability[ds] && (availability[ds] || []).length > 0;
-                        const sel = modifyForm.date === ds;
-                        return (
-                          <button key={ds} disabled={!avail} onClick={() => setModifyForm(f => ({ ...f, date: ds, time: '' }))} style={{ padding: '6px 2px', background: sel ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : avail ? 'rgba(201,168,76,0.08)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid #C9A84C' : avail ? '1px solid rgba(201,168,76,0.4)' : '1px solid rgba(255,255,255,0.04)', borderRadius: '4px', cursor: avail ? 'pointer' : 'not-allowed', opacity: avail ? 1 : 0.3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', transition: 'all 0.2s' }}>
-                            <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: sel ? '#0A0A0A' : '#8A7968', textTransform: 'uppercase' }}>{format(date, 'EEE', { locale: fr })}</span>
-                            <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '16px', color: sel ? '#0A0A0A' : avail ? '#C9A84C' : '#555', lineHeight: 1 }}>{format(date, 'd')}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Heure */}
-                  {modifyForm.date && (
-                    <div style={{ marginBottom: '18px' }}>
-                      <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '10px' }}>Nouvel horaire</label>
-                      {modifyAvailSlots.length === 0 ? (
-                        <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968', fontStyle: 'italic' }}>Aucun créneau disponible ce jour.</p>
-                      ) : (
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          {modifyAvailSlots.map(t => (
-                            <button key={t} onClick={() => setModifyForm(f => ({ ...f, time: t }))} style={{ padding: '8px 13px', background: modifyForm.time === t ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'transparent', border: modifyForm.time === t ? '1px solid #C9A84C' : '1px solid rgba(201,168,76,0.3)', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '12px', color: modifyForm.time === t ? '#0A0A0A' : '#FAF6EF', cursor: 'pointer', transition: 'all 0.2s' }}>
-                              {t}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-                    <button onClick={() => { setModifyStatus(null); setFoundModifyBooking(null); setModifyBookingId(''); }} style={{ flex: 1, padding: '12px', background: 'transparent', border: '1px solid rgba(201,168,76,0.2)', color: '#8A7968', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer' }}>Retour</button>
-                    <motion.button onClick={handleConfirmModify} whileHover={{ scale: 1.03 }} style={{ flex: 2, padding: '12px', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0A0A0A', border: 'none', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <Edit3 size={12} /> Envoyer la demande
-                    </motion.button>
-                  </div>
-                </>
-              )}
-
-              {modifyStatus === 'modified' && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ textAlign: 'center', padding: '10px 0' }}>
-                  <CheckCircle2 size={40} color="#C9A84C" style={{ marginBottom: '16px' }} />
-                  <h4 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', marginBottom: '10px' }}>Demande envoyée</h4>
-                  <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', lineHeight: 1.6, marginBottom: '20px' }}>
-                    Votre demande de modification a été transmise à Mamifa. Elle vous confirmera les changements par WhatsApp.
-                  </p>
-                  <button onClick={() => setShowModifyModal(false)} style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #C9A84C, #E8C97A)', color: '#0A0A0A', border: 'none', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: 'pointer' }}>
-                    Fermer
-                  </button>
                 </motion.div>
               )}
             </motion.div>

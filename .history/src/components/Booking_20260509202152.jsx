@@ -612,7 +612,7 @@ N°réservation : ${b.id}
 Modifications demandées :
 ${changeLines}
 ━━━━━━━━━━━━━━━━━━━
-Merci de valider dans votre dashboard.`;
+Merci de valider dans le dashboard.`;
       notifyAdminWhatsApp(adminMsg);
 
       setModifyStatus('modified');
@@ -648,8 +648,7 @@ Merci de valider dans votre dashboard.`;
         </h2>
         <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg, transparent, #C9A84C, transparent)', margin: '0 auto 24px' }} />
         <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '14px', color: '#8A7968', maxWidth: '440px', margin: '0 auto' }}>
-          Choisissez votre prestation, votre date, et sécurisez votre réservation avec un acompte(obligatoire) minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
-          
+          Choisissez votre prestation, votre date, et sécurisez votre créneau avec un acompte minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.
         </p>
       </motion.div>
 
