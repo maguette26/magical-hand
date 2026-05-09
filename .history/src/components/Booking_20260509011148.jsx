@@ -622,8 +622,8 @@ Merci de traiter la demande dans le dashboard.`;
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(22px, 4vw, 28px)', color: '#FAF6EF', marginBottom: '28px' }}>Vos informations</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {[
-                  { label: 'Entrez votre prénom *', value: name, setter: setName, placeholder: 'Ex: Aïssatou', type: 'text' },
-                  { label: 'Entrez votre numéro de téléphone *', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel' },
+                  { label: 'EntrezVotre prénom *', value: name, setter: setName, placeholder: 'Ex: Aïssatou', type: 'text' },
+                  { label: 'Votre numéro de téléphone *', value: phone, setter: setPhone, placeholder: 'Ex: 77 000 00 00', type: 'tel' },
                 ].map((field) => (
                   <div key={field.label}>
                     <label style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#8A7968', display: 'block', marginBottom: '8px' }}>{field.label}</label>
@@ -646,7 +646,7 @@ Merci de traiter la demande dans le dashboard.`;
                 { label: 'Prestation', value: service?.label },
                 { label: 'Tarif total', value: service?.price },
                 { label: 'Date', value: selectedDate ? format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr }) : '' },
-                { label: 'Heure', value: selectedTime ,heure},
+                { label: 'Heure', value: selectedTime },
                 { label: 'Prénom', value: name },
                 phone ? { label: 'Téléphone', value: phone } : null,
               ].filter(Boolean).map((r) => (

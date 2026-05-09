@@ -56,7 +56,7 @@ export default function Gallery() {
       : photos.filter(p => p.category === activeCategory);
 
   return (
-   <section id="galerie" className="ig-section">
+    <section className="ig-section">
 
       {/* HEADER */}
       <div className="ig-header">

@@ -645,8 +645,8 @@ Merci de traiter la demande dans le dashboard.`;
               {[
                 { label: 'Prestation', value: service?.label },
                 { label: 'Tarif total', value: service?.price },
-                { label: 'Date', value: selectedDate ? format(selectedDate, 'EEEE d MMMM yyyy', { locale: fr }) : '' },
-                { label: 'Heure', value: selectedTime ,heure},
+                { label: 'Date', value: selectedDate ? format(selectedDate, 'EEEE d MMMM yyyy'h, { locale: fr }) : '' },
+                { label: 'Heure', value: selectedTime },
                 { label: 'Prénom', value: name },
                 phone ? { label: 'Téléphone', value: phone } : null,
               ].filter(Boolean).map((r) => (

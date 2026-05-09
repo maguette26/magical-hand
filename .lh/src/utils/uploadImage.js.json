@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 2,
+            "activePatchIndex": 3,
             "patches": [
                 {
                     "date": 1778255879656,
@@ -16,6 +16,10 @@
                 {
                     "date": 1778256512916,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -2,10 +2,9 @@\n \r\n export const uploadImage = async (file) => {\r\n   const formData = new FormData();\r\n   formData.append(\"file\", file);\r\n-  formData.append(\"upload_preset\", \"ml_default\"); // preset gratuit Cloudinary\r\n-\r\n+formData.append(\"upload_preset\", \"magical_hand\");\r\n   const res = await axios.post(\r\n     \"https://api.cloudinary.com/v1_1/dt3zluycp/image/upload\",\r\n     formData\r\n   );\r\n"
+                },
+                {
+                    "date": 1778346137855,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,13 +1,1 @@\n-import axios from \"axios\";\r\n-\r\n-export const uploadImage = async (file) => {\r\n-  const formData = new FormData();\r\n-  formData.append(\"file\", file);\r\n-formData.append(\"upload_preset\", \"magical_hand\");\r\n-  const res = await axios.post(\r\n-    \"https://api.cloudinary.com/v1_1/dt3zluycp/image/upload\",\r\n-    formData\r\n-  );\r\n-\r\n-  return res.data.secure_url;\r\n-};\n\\ No newline at end of file\n+c\n\\ No newline at end of file\n"
                 }
             ],
             "date": 1778255879656,
