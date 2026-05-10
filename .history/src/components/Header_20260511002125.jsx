@@ -47,40 +47,22 @@ export default function Header() {
           transition: 'all 0.4s ease',
         }}
       >
-    {/* Logo */}
+     {/* Logo */}
 <motion.div
-  whileHover={{ scale: 1.03 }}
-  whileTap={{ scale: 0.98 }}
-  style={{ cursor: 'pointer', position: 'relative' }}
+  whileHover={{ scale: 1.02 }}
+  style={{ cursor: 'pointer' }}
   onClick={() => scrollTo('#hero')}
 >
-  {/* Halo doré derrière le logo */}
-  <motion.div
-    animate={{ opacity: [0.4, 0.7, 0.4] }}
-    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+  <img
+    src="/images/logo.png"
+    alt="Magical Hand by Mamifa"
     style={{
-      position: 'absolute',
-      inset: '-10px -16px',
-      background: 'radial-gradient(ellipse at center, rgba(201,168,76,0.12) 0%, transparent 70%)',
-      borderRadius: '12px',
-      pointerEvents: 'none',
+      height: window.innerWidth < 768 ? '40px' : '55px',
+      width: 'auto',
+      objectFit: 'contain',
+      display: 'block',
     }}
   />
-  <img
-  src="/images/logo.png"
-  alt="Magical Hand by Mamifa"
-  style={{
-    height: window.innerWidth < 768 ? '60px' : '90px',
-    width: 'auto',
-    transform: 'scale(1.8)',
-    transformOrigin: 'left center',
-    display: 'block',
-    filter: scrolled
-      ? 'drop-shadow(0 0 8px rgba(201,168,76,0.25)) brightness(1.05)'
-      : 'drop-shadow(0 2px 12px rgba(201,168,76,0.15)) brightness(1)',
-    transition: 'filter 0.4s ease',
-  }}
-/>
 </motion.div>
 
         {/* Desktop Nav */}

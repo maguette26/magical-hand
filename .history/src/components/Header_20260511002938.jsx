@@ -70,7 +70,7 @@ export default function Header() {
   src="/images/logo.png"
   alt="Magical Hand by Mamifa"
   style={{
-    height: window.innerWidth < 768 ? '60px' : '90px',
+    height: window.innerWidth < 768 ? '80px' : '130px',
     width: 'auto',
     transform: 'scale(1.8)',
     transformOrigin: 'left center',

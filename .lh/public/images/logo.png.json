@@ -3,11 +3,15 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 0,
+            "activePatchIndex": 1,
             "patches": [
                 {
                     "date": 1778346887966,
                     "content": "Index: \n===================================================================\n--- \n+++ \n"
+                },
+                {
+                    "date": 1778454943017,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,1 +1,1 @@\n-logo.png\n\\ No newline at end of file\n+c:\\Users\\Administrateur\\Downloads\\logo.png\n\\ No newline at end of file\n"
                 }
             ],
             "date": 1778346887966,

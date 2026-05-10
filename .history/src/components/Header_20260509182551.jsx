@@ -47,41 +47,38 @@ export default function Header() {
           transition: 'all 0.4s ease',
         }}
       >
-    {/* Logo */}
-<motion.div
-  whileHover={{ scale: 1.03 }}
-  whileTap={{ scale: 0.98 }}
-  style={{ cursor: 'pointer', position: 'relative' }}
-  onClick={() => scrollTo('#hero')}
->
-  {/* Halo doré derrière le logo */}
-  <motion.div
-    animate={{ opacity: [0.4, 0.7, 0.4] }}
-    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-    style={{
-      position: 'absolute',
-      inset: '-10px -16px',
-      background: 'radial-gradient(ellipse at center, rgba(201,168,76,0.12) 0%, transparent 70%)',
-      borderRadius: '12px',
-      pointerEvents: 'none',
-    }}
-  />
-  <img
-  src="/images/logo.png"
-  alt="Magical Hand by Mamifa"
-  style={{
-    height: window.innerWidth < 768 ? '60px' : '90px',
-    width: 'auto',
-    transform: 'scale(1.8)',
-    transformOrigin: 'left center',
-    display: 'block',
-    filter: scrolled
-      ? 'drop-shadow(0 0 8px rgba(201,168,76,0.25)) brightness(1.05)'
-      : 'drop-shadow(0 2px 12px rgba(201,168,76,0.15)) brightness(1)',
-    transition: 'filter 0.4s ease',
-  }}
-/>
-</motion.div>
+        {/* Logo */}
+        <motion.div
+          whileHover={{ scale: 1.02 }}
+          style={{ cursor: 'pointer' }}
+          onClick={() => scrollTo('#hero')}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
+            <span style={{
+              fontFamily: 'Cormorant Garamond, serif',
+              fontSize: '26px',
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              background: 'linear-gradient(135deg, #C9A84C, #E8C97A, #C9A84C)',
+              backgroundSize: '200% auto',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              animation: 'shimmer 3s linear infinite',
+            }}>
+              Magical Hand
+            </span>
+            <span style={{
+              fontFamily: 'Jost, sans-serif',
+              fontSize: '10px',
+              fontWeight: 300,
+              letterSpacing: '0.25em',
+              color: '#8A7968',
+              textTransform: 'uppercase',
+            }}>
+              by Mamifa
+            </span>
+          </div>
+        </motion.div>
 
         {/* Desktop Nav */}
         <nav style={{ display: 'flex', gap: '36px', alignItems: 'center' }}
