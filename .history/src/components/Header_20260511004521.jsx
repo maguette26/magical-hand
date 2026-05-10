@@ -67,15 +67,17 @@ export default function Header() {
     }}
   />
   <img
-  src="/images/logo.png"
+  src="/images/logo().png"
   alt="Magical Hand by Mamifa"
   style={{
-    height: window.innerWidth < 768 ? '52px' : '68px',
+    height: window.innerWidth < 768 ? '60px' : '90px',
     width: 'auto',
-    objectFit: 'contain',
+    transform: 'scale(1.8)',
+    transformOrigin: 'left center',
     display: 'block',
-    mixBlendMode: 'lighten',
-    filter: 'drop-shadow(0 0 8px rgba(201,168,76,0.22))',
+    filter: scrolled
+      ? 'drop-shadow(0 0 8px rgba(201,168,76,0.25)) brightness(1.05)'
+      : 'drop-shadow(0 2px 12px rgba(201,168,76,0.15)) brightness(1)',
     transition: 'filter 0.4s ease',
   }}
 />

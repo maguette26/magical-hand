@@ -67,16 +67,17 @@ export default function Header() {
     }}
   />
   <img
-  src="/images/logo.png"
+  src="/images/logo2.png"
   alt="Magical Hand by Mamifa"
   style={{
-    height: window.innerWidth < 768 ? '52px' : '68px',
+    height: window.innerWidth < 768 ? '60px' : '90px',
     width: 'auto',
-    objectFit: 'contain',
+    transform: 'scale(1.8)',
+    transformOrigin: 'left center',
     display: 'block',
-    mixBlendMode: 'lighten',
+    mixBlendMode: 'screen',
+    opacity: 0.95,
     filter: 'drop-shadow(0 0 8px rgba(201,168,76,0.22))',
-    transition: 'filter 0.4s ease',
   }}
 />
 </motion.div>

@@ -67,7 +67,7 @@ export default function Header() {
     }}
   />
   <img
-  src="/images/logo.png"
+  src="/images/logo2.png"
   alt="Magical Hand by Mamifa"
   style={{
     height: window.innerWidth < 768 ? '52px' : '68px',
