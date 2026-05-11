@@ -128,9 +128,9 @@ function notifyWA(booking, type, extra = {}) {
   const date = extra.newDate || booking.date;
   const time = extra.newTime || booking.time;
   const templates = {
-    confirmed: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nVotre rendez-vous est *confirmé* ! 🎉\n\n💋 Prestation : ${booking.service}\n📅 Date : ${date}\n🕐 Heure : ${time}\n\nMerci pour votre confiance et  Merci d’arriver quelques minutes avant le rendez-vous.. À très bientôt !\n_Magical Hand by Mamifa_ ✨`,
-    cancelled: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}*,\n\nMalheureusement votre réservation du *${date} à ${time}* n'a pas pu être confirmée et est annulée.\n\n✨ D’autres créneaux restent disponibles cette semaine.\n\nN'hésitez pas à nous recontacter pour fixer un nouveau rendez-vous.\n\n_Magical Hand by Mamifa_ 💄`,
-    rescheduled: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nVotre rendez-vous a été *déplacé* 📅\n\n💋 Prestation : ${booking.service}\n📅 Nouveau créneau : ${date} à ${time} \n\nPour toute question, répondez à ce message.\n_Magical Hand by Mamifa_ ✨`,
+    confirmed: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nVotre rendez-vous est *confirmé* ! 🎉\n\n💋 Prestation : ${booking.service}\n📅 Date : ${date}\n🕐 Heure : ${time}\n\nMerci pour votre confiance. À très bientôt !\n_Magical Hand by Mamifa_ ✨`,
+    cancelled: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}*,\n\nMalheureusement votre réservation du *${date} à ${time}* n'a pas pu être confirmée et est annulée.\n\nN'hésitez pas à nous recontacter pour fixer un nouveau rendez-vous.\n\n_Magical Hand by Mamifa_ 💄`,
+    rescheduled: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nVotre rendez-vous a été *déplacé* 📅\n\n💋 Prestation : ${booking.service}\n📅 Nouveau créneau : ${date} à ${time} heure \n\nPour toute question, répondez à ce message.\n_Magical Hand by Mamifa_ ✨`,
     reminder: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nRappel : votre rendez-vous est *demain* !\n\n💋 Prestation : ${booking.service}\n📅 Date : ${date}\n🕐 Heure : ${time}\n\nNous vous attendons !\n_Magical Hand by Mamifa_ ✨`,
     cancellation_rejected: `✨ *MAGICAL HAND BY MAMIFA* ✨\nBonjour *${name}*, votre demande d'annulation n'a pas pu être acceptée. Votre rendez-vous du *${date} à ${time}* est maintenu. Contactez-nous pour plus d'informations.`,
   };
