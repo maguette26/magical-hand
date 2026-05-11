@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 7,
+            "activePatchIndex": 8,
             "patches": [
                 {
                     "date": 1778459248495,
@@ -36,6 +36,10 @@
                 {
                     "date": 1778515287778,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -8,12 +8,13 @@\n     <meta name=\"description\" content=\"Maquillage professionnel par Mamifa - Glam, Cérémonie, Mariage, Baptême\" />\n     <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n     <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n     <link href=\"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap\" rel=\"stylesheet\">\n-  <title>MagicalHand by Mamifa</title>\n+  <title>Magical-Hand by Mamifa</title>\n <meta name=\"description\" content=\"Réservation de prestations beauté avec Mamifa\" />\n     <meta name=\"google-site-verification\" content=\"2TnYoYFLrICrwR8Wwyw8tg70wLv6m9ZsZ0nCWV_6Sxw\" />\n     <link rel=\"canonical\" href=\"https://magicalhandbymamifa.com\" />\n+    <meta name=\"robots\" content=\"index, follow\" />\n   </head>\n   <body>\n     <div id=\"root\"></div>\n     <script type=\"module\" src=\"/src/main.jsx\"></script>\n"
+                },
+                {
+                    "date": 1778515563454,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -3,9 +3,9 @@\n   <head>\n     <meta charset=\"UTF-8\" />\n     <link rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\" />\n     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n-    <title>Magical Hand by Mamifa</title>\n+    <title>Magical-Hand by Mamifa</title>\n     <meta name=\"description\" content=\"Maquillage professionnel par Mamifa - Glam, Cérémonie, Mariage, Baptême\" />\n     <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n     <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n     <link href=\"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap\" rel=\"stylesheet\">\n"
                 }
             ],
             "date": 1778459248495,
