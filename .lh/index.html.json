@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 8,
+            "activePatchIndex": 9,
             "patches": [
                 {
                     "date": 1778459248495,
@@ -40,6 +40,10 @@
                 {
                     "date": 1778515563454,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -3,9 +3,9 @@\n   <head>\n     <meta charset=\"UTF-8\" />\n     <link rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\" />\n     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n-    <title>Magical Hand by Mamifa</title>\n+    <title>Magical-Hand by Mamifa</title>\n     <meta name=\"description\" content=\"Maquillage professionnel par Mamifa - Glam, Cérémonie, Mariage, Baptême\" />\n     <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n     <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n     <link href=\"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap\" rel=\"stylesheet\">\n"
+                },
+                {
+                    "date": 1778516018958,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,21 +1,28 @@\n <!DOCTYPE html>\n <html lang=\"fr\">\n-  <head>\n-    <meta charset=\"UTF-8\" />\n-    <link rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\" />\n-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n-    <title>Magical-Hand by Mamifa</title>\n-    <meta name=\"description\" content=\"Maquillage professionnel par Mamifa - Glam, Cérémonie, Mariage, Baptême\" />\n-    <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n-    <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n-    <link href=\"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap\" rel=\"stylesheet\">\n-  <title>Magical-Hand by Mamifa</title>\n-<meta name=\"description\" content=\"Réservation de prestations beauté avec Mamifa\" />\n-    <meta name=\"google-site-verification\" content=\"2TnYoYFLrICrwR8Wwyw8tg70wLv6m9ZsZ0nCWV_6Sxw\" />\n-    <link rel=\"canonical\" href=\"https://magicalhandbymamifa.com\" />\n-    <meta name=\"robots\" content=\"index, follow\" />\n-  </head>\n+ <head>\n+  <meta charset=\"UTF-8\" />\n+  <link rel=\"icon\" type=\"image/svg+xml\" href=\"/favicon.svg\" />\n+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n+\n+  <title>Magical Hand by Mamifa | Réservation Beauté & Maquillage</title>\n+\n+  <meta name=\"description\" content=\"Maquillage professionnel par Mamifa - Glam, Cérémonie, Mariage, Baptême. Réservez votre prestation beauté en ligne.\" />\n+\n+  <meta name=\"google-site-verification\" content=\"2TnYoYFLrICrwR8Wwyw8tg70wLv6m9ZsZ0nCWV_6Sxw\" />\n+\n+  <link rel=\"canonical\" href=\"https://magicalhandbymamifa.com\" />\n+\n+  <meta name=\"robots\" content=\"index, follow\" />\n+\n+  <meta name=\"keywords\" content=\"maquillage, beauté, Mamifa, réservation, mariage, cérémonie, Casablanca\" />\n+\n+  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n+  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n+\n+  <link href=\"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap\" rel=\"stylesheet\">\n+</head>\n   <body>\n     <div id=\"root\"></div>\n     <script type=\"module\" src=\"/src/main.jsx\"></script>\n   </body>\n"
                 }
             ],
             "date": 1778459248495,
