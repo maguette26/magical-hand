@@ -5,7 +5,7 @@ import {
   collection, onSnapshot, query, where, addDoc, serverTimestamp,
   updateDoc, doc, getDoc, setDoc
 } from 'firebase/firestore';
-import { format, addDays, isSameDay, isToday } from 'date-fns';
+import { format, addDays, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
   Sparkles, Camera, Crown, Clock, ChevronLeft, ChevronRight,
@@ -17,7 +17,7 @@ import { uploadImage } from '../utils/uploadImage';
 const WHATSAPP_NUMBER   = '221776695790';
 const ACOMPTE_MIN       = 2000;
 const PAYMENT_EXPIRY_HOURS = 24;
-const POST_PAYMENT_REDIRECT_DELAY = 6000;
+const POST_PAYMENT_REDIRECT_DELAY = 6000; // 6 s après upload réussi
 
 const SERVICES = [
   { id: 1, label: 'Maquillage Simple',               price: '7 000 FCFA',          montantTotal: 7000,  description: 'Look naturel et soigné, idéal pour le quotidien',        Icon: Wand2 },
@@ -53,38 +53,34 @@ const STEPS = [
   { n: 5, label: 'Confirmation' },
 ];
 
-// ─── Helpers pour les heures ──────────────────────────────────────────────────
+// ─── État initial du formulaire (centralise le reset) ────────────────────────
+const INITIAL_FORM_STATE = {
+  step:           1,
+  selectedService: null,
+  selectedDate:   null,
+  selectedTime:   null,
+  name:           '',
+  phone:          '',
+  weekOffset:     0,
+  paymentType:    'acompte',
+  customAmount:   '',
+  bookingId:      null,
+  bookingData:    null,
+  proofFile:      null,
+  proofPreview:   null,
+  paymentSent:    false,
+  creatingBooking: false,
+  convertingImage: false,
+  uploading:      false,
+};
 
-/**
- * Convertit "09:00" ou "14:30" en minutes depuis minuit.
- */
-function timeToMinutes(timeStr) {
-  const [h, m] = timeStr.split(':').map(Number);
-  return h * 60 + (m || 0);
-}
-
-/**
- * Retourne true si ce créneau est encore dans le futur pour une date donnée.
- * Pour les dates futures (pas aujourd'hui) : toujours true.
- * Pour aujourd'hui : le créneau doit être au moins 30 min dans le futur.
- */
-function isSlotStillValid(date, slot) {
-  if (!isToday(date)) return true;
-  const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  return timeToMinutes(slot) > currentMinutes + 30; // marge de 30 min
-}
-
-/**
- * Retourne les créneaux valides (non passés) pour une date.
- * Pour aujourd'hui, filtre les heures passées.
- */
-function getValidSlots(date, allSlots) {
-  if (!allSlots || allSlots.length === 0) return [];
-  return allSlots.filter(slot => isSlotStillValid(date, slot));
-}
-
-// ─── WhatsApp opener ──────────────────────────────────────────────────────────
+// ─── WhatsApp opener — robuste sur tous les navigateurs ──────────────────────
+// Règle iOS Safari : window.open() est bloqué après tout await.
+// Solution : stocker le message AVANT l'await, puis appeler openWhatsApp()
+// UNIQUEMENT dans le handler synchrone OU via un <a> cliqué programmatiquement.
+//
+// Pour les cas post-await (annulation, preuve), on utilise une ancre invisible
+// avec href que l'on place puis clique dans un microtask — fonctionne sur iOS 15+.
 function openWhatsApp(message) {
   const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
   _triggerLink(url);
@@ -97,11 +93,13 @@ function openWhatsAppTo(phone, message) {
 }
 
 function _triggerLink(url) {
+  // Méthode 1 : ancre injectée dans le DOM (iOS Safari + Chrome Android)
   try {
     const a = document.createElement('a');
     a.href = url;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
+    // L'ancre doit être dans le DOM pour Safari
     a.style.position = 'fixed';
     a.style.opacity  = '0';
     a.style.top      = '0';
@@ -110,11 +108,12 @@ function _triggerLink(url) {
     a.click();
     setTimeout(() => { try { document.body.removeChild(a); } catch (_) {} }, 1000);
   } catch (_) {
+    // Méthode 2 : fallback window.open
     window.open(url, '_blank', 'noopener,noreferrer');
   }
 }
 
-// ─── Gallery Swipe Component ──────────────────────────────────────────────────
+// ─── Gallery Swipe Component ─────────────────────────────────────────────────
 export function GallerySwipeHint({ photos = [] }) {
   const scrollRef = useRef(null);
   const [canScrollLeft,  setCanScrollLeft]  = useState(false);
@@ -226,7 +225,7 @@ export function GallerySwipeHint({ photos = [] }) {
   );
 }
 
-// ─── Countdown Timer ──────────────────────────────────────────────────────────
+// ─── Countdown Timer ─────────────────────────────────────────────────────────
 function CountdownTimer({ expiresAt }) {
   const [remaining, setRemaining] = useState('');
   const [expired,   setExpired]   = useState(false);
@@ -253,7 +252,7 @@ function CountdownTimer({ expiresAt }) {
   );
 }
 
-// ─── Image → JPEG converter ───────────────────────────────────────────────────
+// ─── Image → JPEG converter (fix Safari iOS / HEIC) ─────────────────────────
 function convertToJpeg(file) {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(file);
@@ -303,6 +302,7 @@ function convertToJpeg(file) {
 
 // ─── Main Booking Component ───────────────────────────────────────────────────
 export default function Booking() {
+  // ── Formulaire principal ──────────────────────────────────────────────────
   const [step,            setStep]            = useState(1);
   const [selectedService, setSelectedService] = useState(null);
   const [selectedDate,    setSelectedDate]    = useState(null);
@@ -311,22 +311,26 @@ export default function Booking() {
   const [phone,           setPhone]           = useState('');
   const [weekOffset,      setWeekOffset]      = useState(0);
 
+  // Paiement
   const [paymentType,   setPaymentType]   = useState('acompte');
   const [customAmount,  setCustomAmount]  = useState('');
 
-  const [bookingId,         setBookingId]         = useState(null);
-  const [bookingData,       setBookingData]        = useState(null);
-  const [proofFile,         setProofFile]          = useState(null);
-  const [proofPreview,      setProofPreview]       = useState(null);
-  const [uploading,         setUploading]          = useState(false);
-  const [paymentSent,       setPaymentSent]        = useState(false);
-  const [creatingBooking,   setCreatingBooking]    = useState(false);
-  const [convertingImage,   setConvertingImage]    = useState(false);
-  const [redirectCountdown, setRedirectCountdown]  = useState(null);
+  // Step 5
+  const [bookingId,       setBookingId]       = useState(null);
+  const [bookingData,     setBookingData]     = useState(null);
+  const [proofFile,       setProofFile]       = useState(null);
+  const [proofPreview,    setProofPreview]    = useState(null);
+  const [uploading,       setUploading]       = useState(false);
+  const [paymentSent,     setPaymentSent]     = useState(false);
+  const [creatingBooking, setCreatingBooking] = useState(false);
+  const [convertingImage, setConvertingImage] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(null);
 
+  // Disponibilités / créneaux
   const [availability, setAvailability] = useState({});
   const [bookedSlots,  setBookedSlots]  = useState([]);
 
+  // Modification
   const [showModifyModal,    setShowModifyModal]    = useState(false);
   const [modifyBookingId,    setModifyBookingId]    = useState('');
   const [modifyStatus,       setModifyStatus]       = useState(null);
@@ -335,30 +339,22 @@ export default function Booking() {
   const [modifyWeekOffset,   setModifyWeekOffset]   = useState(0);
   const [modifyAvailSlots,   setModifyAvailSlots]   = useState([]);
 
-  const [showCancelModal,  setShowCancelModal]  = useState(false);
-  const [cancelBookingId,  setCancelBookingId]  = useState('');
-  const [cancelStatus,     setCancelStatus]     = useState(null);
-  const [foundBooking,     setFoundBooking]     = useState(null);
-  const [cancelRedirect,   setCancelRedirect]   = useState(null);
-
-  // ─── Ticker pour rafraîchir le filtrage des heures passées ───────────────
-  // Re-render toutes les minutes pour retirer les créneaux qui viennent de passer.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  // Annulation
+  const [showCancelModal,    setShowCancelModal]    = useState(false);
+  const [cancelBookingId,    setCancelBookingId]    = useState('');
+  const [cancelStatus,       setCancelStatus]       = useState(null);
+  const [foundBooking,       setFoundBooking]       = useState(null);
+  const [cancelRedirect,     setCancelRedirect]     = useState(null);
 
   const proofRef = useRef();
+  // Ref pour éviter double-envoi (React StrictMode / re-renders)
   const uploadingRef = useRef(false);
 
-  // ── Fenêtres de jours visibles ────────────────────────────────────────────
-  // FIX PRINCIPAL : on commence à i=0 (aujourd'hui) au lieu de i+1 (demain)
   const visibleDays = Array.from({ length: 7 }, (_, i) =>
-    addDays(new Date(), weekOffset * 7 + i)
+    addDays(new Date(), weekOffset * 7 + i + 1)
   );
   const modifyVisibleDays = Array.from({ length: 7 }, (_, i) =>
-    addDays(new Date(), modifyWeekOffset * 7 + i)
+    addDays(new Date(), modifyWeekOffset * 7 + i + 1)
   );
 
   const service      = SERVICES.find(s => s.id === selectedService);
@@ -371,13 +367,13 @@ export default function Booking() {
     return ACOMPTE_MIN;
   }, [paymentType, customAmount, montantTotal]);
 
-  const montantPaye = getAcompteAmount();
-  const resteAPayer = montantTotal - montantPaye;
+  const montantPaye  = getAcompteAmount();
+  const resteAPayer  = montantTotal - montantPaye;
 
   const getAcompteShortcuts = () =>
     [2000, 3000, 4000, 5000, 7000, 10000].filter(v => v >= ACOMPTE_MIN && v < montantTotal);
 
-  // ── Reset complet ─────────────────────────────────────────────────────────
+  // ── Reset complet du formulaire ───────────────────────────────────────────
   const resetForm = useCallback(() => {
     setStep(1);
     setSelectedService(null);
@@ -400,6 +396,7 @@ export default function Booking() {
     uploadingRef.current = false;
   }, []);
 
+  // ── Redirection accueil ───────────────────────────────────────────────────
   const scrollToAccueil = useCallback(() => {
     const el = document.getElementById('accueil');
     if (el) el.scrollIntoView({ behavior: 'smooth' });
@@ -409,7 +406,11 @@ export default function Booking() {
   // ── Countdown post-upload ─────────────────────────────────────────────────
   useEffect(() => {
     if (redirectCountdown === null) return;
-    if (redirectCountdown <= 0) { resetForm(); scrollToAccueil(); return; }
+    if (redirectCountdown <= 0) {
+      resetForm();
+      scrollToAccueil();
+      return;
+    }
     const t = setTimeout(() => setRedirectCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [redirectCountdown, resetForm, scrollToAccueil]);
@@ -417,7 +418,12 @@ export default function Booking() {
   // ── Countdown annulation ──────────────────────────────────────────────────
   useEffect(() => {
     if (cancelRedirect === null) return;
-    if (cancelRedirect <= 0) { setShowCancelModal(false); setCancelRedirect(null); scrollToAccueil(); return; }
+    if (cancelRedirect <= 0) {
+      setShowCancelModal(false);
+      setCancelRedirect(null);
+      scrollToAccueil();
+      return;
+    }
     const t = setTimeout(() => setCancelRedirect(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [cancelRedirect, scrollToAccueil]);
@@ -449,56 +455,16 @@ export default function Booking() {
     return unsub;
   }, [selectedDate]);
 
-  // ── Créneaux dispo pour la modification ──────────────────────────────────
+  // ── Créneaux disponibles pour la modification ─────────────────────────────
   useEffect(() => {
     if (!modifyForm.date) { setModifyAvailSlots([]); return; }
-    const date = new Date(modifyForm.date);
-    const allSlots = availability[modifyForm.date] || [];
-    setModifyAvailSlots(getValidSlots(date, allSlots));
+    setModifyAvailSlots(availability[modifyForm.date] || []);
   }, [modifyForm.date, availability]);
 
-  // ── isDateAvailable : tient compte des heures restantes pour aujourd'hui ──
-  const isDateAvailable = useCallback((date) => {
-    const ds = format(date, 'yyyy-MM-dd');
-    const allSlots = availability[ds];
-    if (!allSlots || allSlots.length === 0) return false;
-    // Pour aujourd'hui, vérifier qu'il reste au moins un créneau valide
-    const valid = getValidSlots(date, allSlots);
-    return valid.length > 0;
-  }, [availability]);
-
-  // ── Créneaux disponibles pour la date sélectionnée ───────────────────────
-  // Ne retourne que les créneaux non réservés ET non passés
-  const getAvailableSlots = useCallback(() => {
-    if (!selectedDate) return [];
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const allSlots = availability[dateStr] || [];
-    const valid = getValidSlots(selectedDate, allSlots);
-    return valid.filter(slot => !bookedSlots.includes(slot));
-  }, [selectedDate, availability, bookedSlots]);
-
-  // Slots bruts pour la date (pour afficher les passés barrés si besoin)
-  const getRawSlotsForDate = useCallback(() => {
-    if (!selectedDate) return [];
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return availability[dateStr] || [];
-  }, [selectedDate, availability]);
-
-  const openSlots  = getAvailableSlots();
-  const rawSlots   = getRawSlotsForDate();
-
-  // Aujourd'hui a des créneaux dans Firestore mais tous passés ?
-  const todayHasOnlyPassedSlots = useCallback((date) => {
-    if (!isToday(date)) return false;
-    const ds = format(date, 'yyyy-MM-dd');
-    const allSlots = availability[ds] || [];
-    if (allSlots.length === 0) return false; // pas de dispo du tout
-    return getValidSlots(date, allSlots).length === 0;
-  }, [availability]);
-
-  // ── Sélection service ─────────────────────────────────────────────────────
+  // ── Sélection service (reset si changement) ───────────────────────────────
   const handleSelectService = (serviceId) => {
     if (selectedService !== null && selectedService !== serviceId) {
+      // Reset partiel : on garde l'étape 1 et on efface tout le reste
       setSelectedDate(null);
       setSelectedTime(null);
       setName('');
@@ -517,6 +483,17 @@ export default function Booking() {
     }
     setSelectedService(serviceId);
   };
+
+  const isDateAvailable  = (date) => {
+    const ds = format(date, 'yyyy-MM-dd');
+    return !!availability[ds] && availability[ds].length > 0;
+  };
+  const getAvailableSlots = () => {
+    if (!selectedDate) return [];
+    return availability[format(selectedDate, 'yyyy-MM-dd')] || [];
+  };
+  const isSlotBooked = (slot) => bookedSlots.includes(slot);
+  const openSlots    = getAvailableSlots();
 
   // ── Sélection preuve — conversion JPEG ───────────────────────────────────
   const handleProofChange = async (e) => {
@@ -538,15 +515,19 @@ export default function Booking() {
     }
   };
 
-  // ── Créer réservation ─────────────────────────────────────────────────────
+  // ── Créer réservation + ouvrir WhatsApp ───────────────────────────────────
+  // ★ RÈGLE ABSOLUE IOS SAFARI :
+  //   openWhatsApp() doit être appelé AVANT tout await.
+  //   On construit le message en synchrone, on déclenche WhatsApp, PUIS on fait Firebase.
   const handleCreateBooking = async () => {
     if (creatingBooking) return;
     setCreatingBooking(true);
 
-    const dateStr       = format(selectedDate, 'yyyy-MM-dd');
+    const dateStr      = format(selectedDate, 'yyyy-MM-dd');
     const acompteChoisi = getAcompteAmount();
     const reste         = montantTotal - acompteChoisi;
 
+    // ★ Message construit en synchrone — ouverture AVANT tout await
     const adminMsg =
 `📅 *MAGICAL HAND — Nouvelle réservation*
 ━━━━━━━━━━━━━━━━━━━
@@ -559,7 +540,7 @@ export default function Booking() {
 ${reste > 0 ? `💵 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n` : ''}━━━━━━━━━━━━━━━━━━━
 Statut : En attente d'acompte ⏳`;
 
-    openWhatsApp(adminMsg);
+    openWhatsApp(adminMsg); // ← SYNCHRONE, avant tout await
 
     try {
       const now = new Date();
@@ -608,8 +589,9 @@ Statut : En attente d'acompte ⏳`;
     }
   };
 
-  // ── Envoi preuve ──────────────────────────────────────────────────────────
+  // ── Envoi preuve de paiement ──────────────────────────────────────────────
   const handleSendProof = async () => {
+    // Double-protection contre le double-clic (ref + state)
     if (!proofFile || uploading || convertingImage || uploadingRef.current) return;
     if (!bookingId) return;
 
@@ -636,6 +618,7 @@ Statut : En attente d'acompte ⏳`;
         paymentConfirmedAt:   serverTimestamp(),
       });
 
+      // Libérer le créneau
       const availSnap = await getDoc(doc(db, 'availability', dateStr));
       if (availSnap.exists()) {
         const slots = (availSnap.data().slots || []).filter(s => s !== selectedTime);
@@ -647,6 +630,7 @@ Statut : En attente d'acompte ⏳`;
         }
       }
 
+      // Messages WhatsApp
       const adminMsg = isPaidFull
         ? `💰 *MAGICAL HAND — Paiement complet reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant total payé : ${montantTotal.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`
         : `✅ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
@@ -655,13 +639,17 @@ Statut : En attente d'acompte ⏳`;
         ? `✔️ *Paiement complet reçu*\nMerci *${name}*, votre rendez-vous est entièrement réglé.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`
         : `✔️ *Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`;
 
+      // Admin en premier (appel synchrone — déclenché dans le contexte clic)
       openWhatsApp(adminMsg);
+      // Client avec délai (iOS bloque les 2 opens simultanés)
       setTimeout(() => {
         const cleanPhone = phone.replace(/\D/g, '');
         if (cleanPhone.length >= 8) openWhatsAppTo(cleanPhone, clientMsg);
       }, 900);
 
       setPaymentSent(true);
+
+      // Compte à rebours avant retour à l'accueil
       setRedirectCountdown(6);
 
     } catch (err) {
@@ -675,10 +663,11 @@ Statut : En attente d'acompte ⏳`;
       );
     } finally {
       setUploading(false);
+      // uploadingRef reste true pour bloquer un double-envoi — il sera reset au resetForm()
     }
   };
 
-  // ── Cancel lookup ─────────────────────────────────────────────────────────
+  // ── Annulation lookup ─────────────────────────────────────────────────────
   const handleCancelLookup = async () => {
     if (!cancelBookingId.trim()) return;
     setCancelStatus('loading');
@@ -699,9 +688,9 @@ Statut : En attente d'acompte ⏳`;
       const newStatus    = isFreeCancel ? 'annule' : 'cancellation_requested';
 
       await updateDoc(doc(db, 'bookings', foundBooking.id), {
-        statutReservation: newStatus,
-        status:            newStatus,
-        cancelRequestedAt: serverTimestamp(),
+        statutReservation:   newStatus,
+        status:              newStatus,
+        cancelRequestedAt:   serverTimestamp(),
       });
 
       if (isFreeCancel && foundBooking.date && foundBooking.time) {
@@ -735,7 +724,7 @@ ${isFreeCancel ? 'Annulation libre — créneau automatiquement libéré.' : "Le
     } catch { setCancelStatus('error'); }
   };
 
-  // ── Modify lookup ─────────────────────────────────────────────────────────
+  // ── Modification lookup ───────────────────────────────────────────────────
   const handleModifyLookup = async () => {
     if (!modifyBookingId.trim()) return;
     setModifyStatus('loading');
@@ -763,12 +752,12 @@ ${isFreeCancel ? 'Annulation libre — créneau automatiquement libéré.' : "Le
       if (Object.keys(changes).length === 0) { setModifyStatus('no_changes'); return; }
 
       await updateDoc(doc(db, 'bookings', b.id), {
-        service:                 modifyForm.service,
-        date:                    modifyForm.date,
-        time:                    modifyForm.time,
-        modificationRequestedAt: serverTimestamp(),
-        statutReservation:       'modification_demandee',
-        status:                  'modification_demandee',
+        service:                    modifyForm.service,
+        date:                       modifyForm.date,
+        time:                       modifyForm.time,
+        modificationRequestedAt:    serverTimestamp(),
+        statutReservation:          'modification_demandee',
+        status:                     'modification_demandee',
       });
 
       const changeLines = Object.entries(changes).map(([k, v]) => `• ${k} : ${v}`).join('\n');
@@ -882,173 +871,52 @@ Merci de valider dans votre dashboard.`;
           {step === 2 && (
             <div>
               <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(22px, 4vw, 28px)', color: '#FAF6EF', marginBottom: '6px' }}>Choisissez votre date</h3>
-              <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968', marginBottom: '24px', letterSpacing: '0.05em' }}>Les dates dorées ont des créneaux disponibles</p>
-
+              <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968', marginBottom: '24px', letterSpacing: '0.05em' }}>Seules les dates dorées sont disponibles</p>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <button onClick={() => setWeekOffset(Math.max(0, weekOffset - 1))} disabled={weekOffset === 0}
-                  style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: weekOffset === 0 ? 'not-allowed' : 'pointer', opacity: weekOffset === 0 ? 0.3 : 1, transition: 'all 0.2s', flexShrink: 0 }}>
+                <button onClick={() => setWeekOffset(Math.max(0, weekOffset - 1))} disabled={weekOffset === 0} style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: weekOffset === 0 ? 'not-allowed' : 'pointer', opacity: weekOffset === 0 ? 0.3 : 1, transition: 'all 0.2s', flexShrink: 0 }}>
                   <ChevronLeft size={15} color="#C9A84C" />
                 </button>
                 <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   {format(visibleDays[0], 'd MMM', { locale: fr })} — {format(visibleDays[6], 'd MMM yyyy', { locale: fr })}
                 </span>
-                <button onClick={() => setWeekOffset(Math.min(3, weekOffset + 1))} disabled={weekOffset >= 3}
-                  style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: weekOffset >= 3 ? 'not-allowed' : 'pointer', opacity: weekOffset >= 3 ? 0.3 : 1, transition: 'all 0.2s', flexShrink: 0 }}>
+                <button onClick={() => setWeekOffset(Math.min(3, weekOffset + 1))} disabled={weekOffset >= 3} style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: weekOffset >= 3 ? 'not-allowed' : 'pointer', opacity: weekOffset >= 3 ? 0.3 : 1, transition: 'all 0.2s', flexShrink: 0 }}>
                   <ChevronRight size={15} color="#C9A84C" />
                 </button>
               </div>
-
-              {/* ── Grille calendrier ── */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '5px' }}>
                 {visibleDays.map((date) => {
-                  const isDateToday = isToday(date);
-                  const avail       = isDateAvailable(date);
-                  // Une date avec uniquement des heures passées : affichée mais non cliquable
-                  const passedOnly  = todayHasOnlyPassedSlots(date);
-                  const ds          = format(date, 'yyyy-MM-dd');
-                  const daySlots    = availability[ds] || [];
-                  const validCount  = getValidSlots(date, daySlots).length;
-                  const sel         = selectedDate && isSameDay(date, selectedDate);
-                  const clickable   = avail && !passedOnly;
-
+                  const avail  = isDateAvailable(date);
+                  const sel    = selectedDate && isSameDay(date, selectedDate);
+                  const ds     = format(date, 'yyyy-MM-dd');
+                  const daySlots = availability[ds] || [];
                   return (
-                    <motion.button
-                      key={date.toISOString()}
-                      disabled={!clickable}
-                      onClick={() => { if (clickable) { setSelectedDate(date); setSelectedTime(null); } }}
-                      whileHover={clickable ? { scale: 1.06 } : {}}
-                      style={{
-                        padding: '8px 2px',
-                        background: sel
-                          ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
-                          : isDateToday && avail
-                            ? 'rgba(201,168,76,0.14)'
-                            : avail
-                              ? 'rgba(201,168,76,0.08)'
-                              : 'rgba(255,255,255,0.02)',
-                        border: sel
-                          ? '1px solid #C9A84C'
-                          : isDateToday
-                            ? '1px solid rgba(201,168,76,0.55)'
-                            : avail
-                              ? '1px solid rgba(201,168,76,0.4)'
-                              : '1px solid rgba(255,255,255,0.05)',
-                        borderRadius: '6px',
-                        cursor: clickable ? 'pointer' : 'not-allowed',
-                        opacity: (!avail && !passedOnly && !isDateToday) ? 0.3 : 1,
-                        transition: 'all 0.2s',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px',
-                        minWidth: 0,
-                        position: 'relative',
-                      }}
+                    <motion.button key={date.toISOString()} disabled={!avail} onClick={() => { setSelectedDate(date); setSelectedTime(null); }} whileHover={avail ? { scale: 1.06 } : {}}
+                      style={{ padding: '8px 2px', background: sel ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : avail ? 'rgba(201,168,76,0.08)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid #C9A84C' : avail ? '1px solid rgba(201,168,76,0.4)' : '1px solid rgba(255,255,255,0.05)', borderRadius: '6px', cursor: avail ? 'pointer' : 'not-allowed', opacity: avail ? 1 : 0.3, transition: 'all 0.2s', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px', minWidth: 0 }}
                     >
-                      {/* Badge "Aujourd'hui" */}
-                      {isDateToday && (
-                        <span style={{
-                          position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)',
-                          fontFamily: 'Jost, sans-serif', fontSize: '7px', letterSpacing: '0.05em',
-                          textTransform: 'uppercase', color: sel ? '#0A0A0A' : '#C9A84C',
-                          background: sel ? 'rgba(10,10,10,0.2)' : 'rgba(10,10,10,0.85)',
-                          border: '1px solid rgba(201,168,76,0.4)',
-                          padding: '1px 5px', borderRadius: '4px', whiteSpace: 'nowrap',
-                        }}>
-                          Auj.
-                        </span>
-                      )}
-
-                      <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '8px', letterSpacing: '0.05em', textTransform: 'uppercase', color: sel ? '#0A0A0A' : '#8A7968', marginTop: isDateToday ? '6px' : '0' }}>
-                        {format(date, 'EEE', { locale: fr })}
-                      </span>
-                      <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(16px, 3.5vw, 22px)', color: sel ? '#0A0A0A' : avail ? '#C9A84C' : '#8A7968', lineHeight: 1 }}>
-                        {format(date, 'd')}
-                      </span>
-                      <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '8px', color: sel ? '#0A0A0A' : '#8A7968', textTransform: 'uppercase' }}>
-                        {format(date, 'MMM', { locale: fr })}
-                      </span>
-
-                      {/* Nombre de créneaux valides */}
-                      {avail && validCount > 0 && (
-                        <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: sel ? '#0A0A0A' : '#C9A84C', opacity: 0.8 }}>
-                          {validCount} cr.
-                        </span>
-                      )}
-
-                      {/* Aucune dispo restante aujourd'hui */}
-                      {passedOnly && (
-                        <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: '#E74C3C', opacity: 0.85 }}>
-                          Complet
-                        </span>
-                      )}
+                      <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '8px', letterSpacing: '0.05em', textTransform: 'uppercase', color: sel ? '#0A0A0A' : '#8A7968' }}>{format(date, 'EEE', { locale: fr })}</span>
+                      <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: 'clamp(16px, 3.5vw, 22px)', color: sel ? '#0A0A0A' : avail ? '#C9A84C' : '#8A7968', lineHeight: 1 }}>{format(date, 'd')}</span>
+                      <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '8px', color: sel ? '#0A0A0A' : '#8A7968', textTransform: 'uppercase' }}>{format(date, 'MMM', { locale: fr })}</span>
+                      {avail && <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: sel ? '#0A0A0A' : '#C9A84C', opacity: 0.75 }}>{daySlots.length} cr.</span>}
                     </motion.button>
                   );
                 })}
               </div>
-
-              {/* ── Créneaux horaires ── */}
               {selectedDate && (
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: '28px' }}>
-
-                  {/* En-tête créneaux */}
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', marginBottom: '14px', letterSpacing: '0.15em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Clock size={13} color="#C9A84C" />
-                    {isToday(selectedDate) ? 'Créneaux disponibles aujourd\'hui' : 'Créneaux disponibles'}
+                    <Clock size={13} color="#C9A84C" /> Créneaux disponibles
                   </p>
-
                   {openSlots.length === 0 ? (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      style={{ padding: '14px 18px', background: 'rgba(231,76,60,0.06)', border: '1px solid rgba(231,76,60,0.2)', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '10px' }}
-                    >
-                      <AlertCircle size={15} color="#E74C3C" style={{ flexShrink: 0 }} />
-                      <div>
-                        <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#E74C3C', margin: '0 0 4px', fontWeight: 600 }}>
-                          {isToday(selectedDate)
-                            ? 'Aucune disponibilité restante aujourd\'hui'
-                            : 'Aucun créneau disponible pour cette date'}
-                        </p>
-                        {isToday(selectedDate) && (
-                          <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', margin: 0 }}>
-                            Tous les créneaux du jour sont passés ou réservés. Choisissez un autre jour.
-                          </p>
-                        )}
-                      </div>
-                    </motion.div>
+                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', fontStyle: 'italic' }}>Aucun créneau disponible pour cette date.</p>
                   ) : (
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {rawSlots.map((t) => {
-                        const isPast    = isToday(selectedDate) && !isSlotStillValid(selectedDate, t);
-                        const isBooked  = bookedSlots.includes(t);
-                        const blocked   = isPast || isBooked;
-                        const sel       = selectedTime === t;
-
+                      {openSlots.map((t) => {
+                        const blocked = isSlotBooked(t);
+                        const sel     = selectedTime === t;
                         return (
-                          <motion.button
-                            key={t}
-                            disabled={blocked}
-                            onClick={() => !blocked && setSelectedTime(t)}
-                            whileHover={!blocked ? { scale: 1.06 } : {}}
-                            title={isPast ? 'Créneau passé' : isBooked ? 'Déjà réservé' : ''}
-                            style={{
-                              padding: '9px 14px',
-                              background: sel ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'transparent',
-                              border: sel
-                                ? '1px solid #C9A84C'
-                                : blocked
-                                  ? '1px solid rgba(255,255,255,0.05)'
-                                  : '1px solid rgba(201,168,76,0.3)',
-                              borderRadius: '4px',
-                              fontFamily: 'Jost, sans-serif', fontSize: '13px',
-                              color: sel ? '#0A0A0A' : blocked ? '#3A3A3A' : '#FAF6EF',
-                              cursor: blocked ? 'not-allowed' : 'pointer',
-                              opacity: blocked ? 0.3 : 1,
-                              transition: 'all 0.2s',
-                              textDecoration: blocked ? 'line-through' : 'none',
-                            }}
-                          >
-                            {t}
-                            {isPast && <span style={{ fontSize: '9px', marginLeft: '4px', opacity: 0.6 }}>passé</span>}
-                          </motion.button>
+                          <motion.button key={t} disabled={blocked} onClick={() => setSelectedTime(t)} whileHover={!blocked ? { scale: 1.06 } : {}}
+                            style={{ padding: '9px 14px', background: sel ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'transparent', border: sel ? '1px solid #C9A84C' : blocked ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(201,168,76,0.3)', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '13px', color: sel ? '#0A0A0A' : blocked ? '#3A3A3A' : '#FAF6EF', cursor: blocked ? 'not-allowed' : 'pointer', opacity: blocked ? 0.3 : 1, transition: 'all 0.2s', textDecoration: blocked ? 'line-through' : 'none' }}
+                          >{t}</motion.button>
                         );
                       })}
                     </div>
@@ -1292,6 +1160,8 @@ Merci de valider dans votre dashboard.`;
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 4px' }}>N° de réservation — conservez-le</p>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', margin: 0, wordBreak: 'break-all' }}>{bookingId}</p>
                   </div>
+
+                  {/* Compte à rebours retour accueil */}
                   {redirectCountdown !== null && (
                     <div style={{ padding: '14px 18px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px' }}>
                       <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', margin: '0 0 8px' }}>
@@ -1348,7 +1218,7 @@ Merci de valider dans votre dashboard.`;
         </div>
       </div>
 
-      {/* ── Cancel Modal ──────────────────────────────────────────────────────── */}
+      {/* ── Cancel Modal ─────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showCancelModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1564,16 +1434,14 @@ Merci de valider dans votre dashboard.`;
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}>
                       {modifyVisibleDays.map(date => {
-                        const ds    = format(date, 'yyyy-MM-dd');
-                        const avail = isDateAvailable(date);
-                        const sel   = modifyForm.date === ds;
-                        const isTod = isToday(date);
+                        const ds   = format(date, 'yyyy-MM-dd');
+                        const avail = !!availability[ds] && (availability[ds] || []).length > 0;
+                        const sel  = modifyForm.date === ds;
                         return (
-                          <button key={ds} disabled={!avail} onClick={() => avail && setModifyForm(f => ({ ...f, date: ds, time: '' }))}
-                            style={{ padding: '6px 2px', background: sel ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : isTod && avail ? 'rgba(201,168,76,0.14)' : avail ? 'rgba(201,168,76,0.08)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid #C9A84C' : isTod ? '1px solid rgba(201,168,76,0.55)' : avail ? '1px solid rgba(201,168,76,0.4)' : '1px solid rgba(255,255,255,0.04)', borderRadius: '4px', cursor: avail ? 'pointer' : 'not-allowed', opacity: avail ? 1 : 0.3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', transition: 'all 0.2s', position: 'relative' }}
+                          <button key={ds} disabled={!avail} onClick={() => setModifyForm(f => ({ ...f, date: ds, time: '' }))}
+                            style={{ padding: '6px 2px', background: sel ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : avail ? 'rgba(201,168,76,0.08)' : 'rgba(255,255,255,0.02)', border: sel ? '1px solid #C9A84C' : avail ? '1px solid rgba(201,168,76,0.4)' : '1px solid rgba(255,255,255,0.04)', borderRadius: '4px', cursor: avail ? 'pointer' : 'not-allowed', opacity: avail ? 1 : 0.3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px', transition: 'all 0.2s' }}
                           >
-                            {isTod && <span style={{ position: 'absolute', top: '-7px', left: '50%', transform: 'translateX(-50%)', fontFamily: 'Jost, sans-serif', fontSize: '6px', color: sel ? '#0A0A0A' : '#C9A84C', background: 'rgba(10,10,10,0.85)', border: '1px solid rgba(201,168,76,0.3)', padding: '1px 4px', borderRadius: '3px', whiteSpace: 'nowrap' }}>Auj.</span>}
-                            <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: sel ? '#0A0A0A' : '#8A7968', textTransform: 'uppercase', marginTop: isTod ? '6px' : '0' }}>{format(date, 'EEE', { locale: fr })}</span>
+                            <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: sel ? '#0A0A0A' : '#8A7968', textTransform: 'uppercase' }}>{format(date, 'EEE', { locale: fr })}</span>
                             <span style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '16px', color: sel ? '#0A0A0A' : avail ? '#C9A84C' : '#555', lineHeight: 1 }}>{format(date, 'd')}</span>
                           </button>
                         );
