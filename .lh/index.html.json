@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 1,
+            "activePatchIndex": 2,
             "patches": [
                 {
                     "date": 1778459248495,
@@ -12,6 +12,10 @@
                 {
                     "date": 1778459254165,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -8,9 +8,9 @@\n     <meta name=\"description\" content=\"Maquillage professionnel par Mamifa - Glam, Cérémonie, Mariage, Baptême\" />\n     <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n     <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n     <link href=\"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap\" rel=\"stylesheet\">\n-  \n+  <meta name=\"google-site-verification\" content=\"J72Lkh5smvuoZ2B8TxwLCAeCqFsZB7xrnGl78mbZuHM\" />\n   </head>\n   <body>\n     <div id=\"root\"></div>\n     <script type=\"module\" src=\"/src/main.jsx\"></script>\n"
+                },
+                {
+                    "date": 1778459983268,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -8,9 +8,9 @@\n     <meta name=\"description\" content=\"Maquillage professionnel par Mamifa - Glam, Cérémonie, Mariage, Baptême\" />\n     <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">\n     <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>\n     <link href=\"https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap\" rel=\"stylesheet\">\n-  <meta name=\"google-site-verification\" content=\"J72Lkh5smvuoZ2B8TxwLCAeCqFsZB7xrnGl78mbZuHM\" />\n+  \n   </head>\n   <body>\n     <div id=\"root\"></div>\n     <script type=\"module\" src=\"/src/main.jsx\"></script>\n"
                 }
             ],
             "date": 1778459248495,
