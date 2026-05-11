@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 2,
+            "activePatchIndex": 4,
             "patches": [
                 {
                     "date": 1778118701677,
@@ -16,6 +16,14 @@
                 {
                     "date": 1778259175469,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -67,16 +67,8 @@\n         Wave · Orange Money\n       </p>\n \n       {/* petit texte */}\n-      <p\n-        style={{\n-          fontSize: \"11px\",\n-          color: \"#5A4E45\",\n-          letterSpacing: \"0.1em\",\n-        }}\n-      >\n-        Réservation via WhatsApp uniquement\n-      </p>\n+       \n     </footer>\n   );\n }\n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1778524902672,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -41,11 +41,38 @@\n           color: \"#FAF6EF\",\n           marginBottom: \"10px\",\n         }}\n       >\n-        📞Téléphone: +221 77 669 57 90\n+        📞 Téléphone : +221 77 669 57 90\n       </p>\n \n+      {/* Adresse */}\n+      <p\n+        style={{\n+          fontSize: \"14px\",\n+          color: \"#FAF6EF\",\n+          marginBottom: \"10px\",\n+        }}\n+      >\n+        📍 Localisation : Casablanca, Maroc\n+      </p>\n+\n+      {/* Google Maps */}\n+      <a\n+        href=\"https://www.google.com/maps\"\n+        target=\"_blank\"\n+        rel=\"noreferrer\"\n+        style={{\n+          fontSize: \"13px\",\n+          color: \"#C9A84C\",\n+          textDecoration: \"none\",\n+          display: \"block\",\n+          marginBottom: \"20px\",\n+        }}\n+      >\n+        Voir sur Google Maps\n+      </a>\n+\n       {/* Paiement */}\n       <p\n         style={{\n           fontSize: \"13px\",\n@@ -60,15 +87,11 @@\n         style={{\n           fontSize: \"14px\",\n           color: \"#C9A84C\",\n           fontWeight: \"500\",\n-          marginBottom: \"20px\",\n         }}\n       >\n         Wave · Orange Money\n       </p>\n-\n-      \n-       \n     </footer>\n   );\n }\n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1778524913907,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -52,9 +52,9 @@\n           color: \"#FAF6EF\",\n           marginBottom: \"10px\",\n         }}\n       >\n-        📍 Localisation : Casablanca, Maroc\n+        📍 Localisation : \n       </p>\n \n       {/* Google Maps */}\n       <a\n"
                 }
             ],
             "date": 1778118701677,

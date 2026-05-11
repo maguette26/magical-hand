@@ -25,7 +25,7 @@ import {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const CATEGORIES = ['Glam', 'Cérémonie', 'Naturel'];
-const ALL_SLOTS = ['08:00','09:00','10:00','11:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00',,'22:00','23:00'];
+const ALL_SLOTS = ['08:00','09:00','10:00','11:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'];
 
 const PAYMENT_EXPIRY_MINUTES = 1440;
 const AUTO_DELETE_AFTER_DAYS = 60;
@@ -1345,28 +1345,11 @@ export default function Admin() {
     boxShadow: '0 20px 60px rgba(0,0,0,0.6)'
   }}
 >
-              <div style={{
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '16px 18px',
-  borderBottom: '1px solid rgba(201,168,76,0.15)',
-  background: 'linear-gradient(135deg, #111, #1a1a1a)'
-}}>
+              <div style={{ display: 'flex', alignItems: 'center', padding: '20px',justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid rgba(201,168,76,0.1)' }}>
                 <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase' }}>Preuve de paiement</span>
                 <button onClick={() => setProofViewer(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px' }}><X size={16} color="#8A7968" /></button>
               </div>
-              <img
-  src={proofViewer}
-  alt="Preuve de paiement"
-  style={{
-    width: '100%',
-    maxHeight: '75vh',
-    objectFit: 'contain',
-    display: 'block',
-    background: '#000'
-  }}
-/>
+              <img src={proofViewer} alt="Preuve de paiement" style={{ width: '100%', maxHeight: '70vh', objectFit: 'contain', display: 'block' }} />
             </motion.div>
           </motion.div>
         )}

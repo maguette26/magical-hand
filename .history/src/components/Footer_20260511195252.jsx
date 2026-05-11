@@ -73,23 +73,38 @@ export default function Footer() {
   <span style={{ color: "#8A7968" }}>•</span>
 
   {/* Link très visible */}
- <a
-  href="https://maps.google.com/?q=14.741251,-17.376959"
-  target="_blank"
-  rel="noreferrer"
-  style={{
-    fontSize: "13px",
-    color: "#C9A84C",
-    textDecoration: "underline",
-    fontWeight: "600",
-    cursor: "pointer",
-  }}
->
-  🗺️ Ouvrir sur Google Maps
-</a>
+  <a
+    href="https://www.google.com/maps/place/Casablanca"
+    target="_blank"
+    rel="noreferrer"
+    style={{
+      fontSize: "13px",
+      color: "#C9A84C",
+      textDecoration: "underline",
+      fontWeight: "600",
+      cursor: "pointer",
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      padding: "4px 8px",
+      border: "1px solid rgba(201,168,76,0.3)",
+      borderRadius: "6px",
+      transition: "0.3s",
+    }}
+  >
+    🗺️ Ouvrir sur Google Maps
+  </a>
 </div>
       {/* Paiement */}
-      
+      <p
+        style={{
+          fontSize: "13px",
+          color: "#8A7968",
+          marginBottom: "6px",
+        }}
+      >
+        Paiement via
+      </p>
 
       <p
         style={{
@@ -98,7 +113,7 @@ export default function Footer() {
           fontWeight: "500",
         }}
       >
-        Paiement via Wave/Orange Money
+        Wave/Orange Money
       </p>
     </footer>
   );

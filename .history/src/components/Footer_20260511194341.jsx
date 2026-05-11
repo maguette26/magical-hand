@@ -45,51 +45,30 @@ export default function Footer() {
         📞 Téléphone : +221 77 669 57 90
       </p>
 
-      {/* Localisation + Google Maps (même ligne) */}
-      <div
-  style={{
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: "10px",
-    marginBottom: "20px",
-    flexWrap: "wrap",
-  }}
->
-  {/* Localisation */}
-  <p
-    style={{
-      fontSize: "14px",
-      color: "#FAF6EF",
-      margin: 0,
-      display: "flex",
-      alignItems: "center",
-      gap: "6px",
-    }}
-  >
-    📍 Localisation : Rond Point Poste Thiaroye,Sénégal
-  </p>
-
-  <span style={{ color: "#8A7968" }}>•</span>
-
-  {/* Link très visible */}
- <a
-  href="https://maps.google.com/?q=14.741251,-17.376959"
-  target="_blank"
-  rel="noreferrer"
-  style={{
-    fontSize: "13px",
-    color: "#C9A84C",
-    textDecoration: "underline",
-    fontWeight: "600",
-    cursor: "pointer",
-  }}
->
-  🗺️ Ouvrir sur Google Maps
-</a>
-</div>
-      {/* Paiement */}
+      {/* Adresse */}
+      <p
+        style={{
+          fontSize: "14px",
+          color: "#FAF6EF",
+          marginBottom: "10px",
+        }}
+      >
+        📍 Localisation : Poste thiaroye, {/* Google Maps */}
       
+      </p>
+
+     
+
+      {/* Paiement */}
+      <p
+        style={{
+          fontSize: "13px",
+          color: "#8A7968",
+          marginBottom: "6px",
+        }}
+      >
+        Paiement via
+      </p>
 
       <p
         style={{
@@ -98,7 +77,7 @@ export default function Footer() {
           fontWeight: "500",
         }}
       >
-        Paiement via Wave/Orange Money
+        Wave · Orange Money
       </p>
     </footer>
   );
