@@ -17,7 +17,7 @@ import { uploadImage } from '../utils/uploadImage';
 const WHATSAPP_NUMBER   = '221776695790';
 const ACOMPTE_MIN       = 2000;
 const PAYMENT_EXPIRY_HOURS = 24;
-const POST_PAYMENT_REDIRECT_DELAY = 8000;
+const POST_PAYMENT_REDIRECT_DELAY = 6000;
 
 const SERVICES = [
   { id: 1, label: 'Maquillage Simple',               price: '7 000 FCFA',          montantTotal: 7000,  description: 'Look naturel et soigné, idéal pour le quotidien',        Icon: Wand2 },
