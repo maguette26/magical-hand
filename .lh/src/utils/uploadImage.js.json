@@ -3,7 +3,7 @@
     "activeCommit": 0,
     "commits": [
         {
-            "activePatchIndex": 3,
+            "activePatchIndex": 5,
             "patches": [
                 {
                     "date": 1778255879656,
@@ -20,6 +20,14 @@
                 {
                     "date": 1778346137855,
                     "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,13 +1,1 @@\n-import axios from \"axios\";\r\n-\r\n-export const uploadImage = async (file) => {\r\n-  const formData = new FormData();\r\n-  formData.append(\"file\", file);\r\n-formData.append(\"upload_preset\", \"magical_hand\");\r\n-  const res = await axios.post(\r\n-    \"https://api.cloudinary.com/v1_1/dt3zluycp/image/upload\",\r\n-    formData\r\n-  );\r\n-\r\n-  return res.data.secure_url;\r\n-};\n\\ No newline at end of file\n+c\n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1778510551617,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,1 +1,21 @@\n-c\n\\ No newline at end of file\n+import axios from \"axios\";\r\n+\r\n+export const uploadImage = async (file) => {\r\n+  try {\r\n+    const formData = new FormData();\r\n+    formData.append(\"file\", file);\r\n+    formData.append(\"upload_preset\", \"magical_hand\");\r\n+\r\n+    const res = await axios.post(\r\n+      \"https://api.cloudinary.com/v1_1/dt3zluycp/image/upload\",\r\n+      formData\r\n+    );\r\n+\r\n+    return res.data.secure_url;\r\n+  } catch (error) {\r\n+    console.log(\"FULL ERROR:\", error);\r\n+    console.log(\"RESPONSE DATA:\", error.response?.data);\r\n+    console.log(\"MESSAGE:\", error.message);\r\n+    throw error;\r\n+  }\r\n+};\n\\ No newline at end of file\n"
+                },
+                {
+                    "date": 1778510558794,
+                    "content": "Index: \n===================================================================\n--- \n+++ \n@@ -1,21 +1,13 @@\n import axios from \"axios\";\r\n \r\n export const uploadImage = async (file) => {\r\n-  try {\r\n-    const formData = new FormData();\r\n-    formData.append(\"file\", file);\r\n-    formData.append(\"upload_preset\", \"magical_hand\");\r\n+  const formData = new FormData();\r\n+  formData.append(\"file\", file);\r\n+formData.append(\"upload_preset\", \"magical_hand\");\r\n+  const res = await axios.post(\r\n+    \"https://api.cloudinary.com/v1_1/dt3zluycp/image/upload\",\r\n+    formData\r\n+  );\r\n \r\n-    const res = await axios.post(\r\n-      \"https://api.cloudinary.com/v1_1/dt3zluycp/image/upload\",\r\n-      formData\r\n-    );\r\n-\r\n-    return res.data.secure_url;\r\n-  } catch (error) {\r\n-    console.log(\"FULL ERROR:\", error);\r\n-    console.log(\"RESPONSE DATA:\", error.response?.data);\r\n-    console.log(\"MESSAGE:\", error.message);\r\n-    throw error;\r\n-  }\r\n+  return res.data.secure_url;\r\n };\n\\ No newline at end of file\n"
                 }
             ],
             "date": 1778255879656,
