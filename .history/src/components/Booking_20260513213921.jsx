@@ -9,10 +9,10 @@ import { format, addDays, isSameDay, isToday } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
   Sparkles, Camera, Crown, Clock, ChevronLeft, ChevronRight,
-  MessageCircle, CreditCard, Check, Wand2, AlertCircle,
+  MessageCircle, CreditCard, Check, Wand2, Upload, AlertCircle,
   CheckCircle2, XCircle, ArrowRight, Images, Edit3, Calendar
 } from 'lucide-react';
-import UploadProof from '../components/UploadProof';
+import { uploadImage } from '../utils/uploadImage';
 
 const WHATSAPP_NUMBER   = '221776695790';
 const ACOMPTE_MIN       = 2000;
@@ -53,23 +53,38 @@ const STEPS = [
   { n: 5, label: 'Confirmation' },
 ];
 
+// ─── Helpers pour les heures ──────────────────────────────────────────────────
+
+/**
+ * Convertit "09:00" ou "14:30" en minutes depuis minuit.
+ */
 function timeToMinutes(timeStr) {
   const [h, m] = timeStr.split(':').map(Number);
   return h * 60 + (m || 0);
 }
 
+/**
+ * Retourne true si ce créneau est encore dans le futur pour une date donnée.
+ * Pour les dates futures (pas aujourd'hui) : toujours true.
+ * Pour aujourd'hui : le créneau doit être au moins 30 min dans le futur.
+ */
 function isSlotStillValid(date, slot) {
   if (!isToday(date)) return true;
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  return timeToMinutes(slot) > currentMinutes + 30;
+  return timeToMinutes(slot) > currentMinutes + 30; // marge de 30 min
 }
 
+/**
+ * Retourne les créneaux valides (non passés) pour une date.
+ * Pour aujourd'hui, filtre les heures passées.
+ */
 function getValidSlots(date, allSlots) {
   if (!allSlots || allSlots.length === 0) return [];
   return allSlots.filter(slot => isSlotStillValid(date, slot));
 }
 
+// ─── WhatsApp opener ──────────────────────────────────────────────────────────
 function openWhatsApp(message) {
   const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
   _triggerLink(url);
@@ -99,6 +114,7 @@ function _triggerLink(url) {
   }
 }
 
+// ─── Gallery Swipe Component ──────────────────────────────────────────────────
 export function GallerySwipeHint({ photos = [] }) {
   const scrollRef = useRef(null);
   const [canScrollLeft,  setCanScrollLeft]  = useState(false);
@@ -210,6 +226,7 @@ export function GallerySwipeHint({ photos = [] }) {
   );
 }
 
+// ─── Countdown Timer ──────────────────────────────────────────────────────────
 function CountdownTimer({ expiresAt }) {
   const [remaining, setRemaining] = useState('');
   const [expired,   setExpired]   = useState(false);
@@ -236,6 +253,55 @@ function CountdownTimer({ expiresAt }) {
   );
 }
 
+// ─── Image → JPEG converter ───────────────────────────────────────────────────
+function convertToJpeg(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const MAX = 2048;
+        let { naturalWidth: w, naturalHeight: h } = img;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round((h * MAX) / w); w = MAX; }
+          else       { w = Math.round((w * MAX) / h); h = MAX; }
+        }
+        canvas.width  = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+
+        canvas.toBlob(
+          (blob) => {
+            URL.revokeObjectURL(objectUrl);
+            if (!blob) { reject(new Error('canvas.toBlob() a retourné null')); return; }
+            const safeFile = new File([blob], 'preuve-paiement.jpg', { type: 'image/jpeg' });
+            resolve(safeFile);
+          },
+          'image/jpeg',
+          0.88
+        );
+      } catch (canvasErr) {
+        URL.revokeObjectURL(objectUrl);
+        reject(canvasErr);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      console.warn('[convertToJpeg] Fallback : fichier original utilisé.');
+      resolve(file);
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+// ─── Main Booking Component ───────────────────────────────────────────────────
 export default function Booking() {
   const [step,            setStep]            = useState(1);
   const [selectedService, setSelectedService] = useState(null);
@@ -250,8 +316,12 @@ export default function Booking() {
 
   const [bookingId,         setBookingId]         = useState(null);
   const [bookingData,       setBookingData]        = useState(null);
+  const [proofFile,         setProofFile]          = useState(null);
+  const [proofPreview,      setProofPreview]       = useState(null);
+  const [uploading,         setUploading]          = useState(false);
   const [paymentSent,       setPaymentSent]        = useState(false);
   const [creatingBooking,   setCreatingBooking]    = useState(false);
+  const [convertingImage,   setConvertingImage]    = useState(false);
   const [redirectCountdown, setRedirectCountdown]  = useState(null);
 
   const [availability, setAvailability] = useState({});
@@ -271,12 +341,19 @@ export default function Booking() {
   const [foundBooking,     setFoundBooking]     = useState(null);
   const [cancelRedirect,   setCancelRedirect]   = useState(null);
 
+  // ─── Ticker pour rafraîchir le filtrage des heures passées ───────────────
+  // Re-render toutes les minutes pour retirer les créneaux qui viennent de passer.
   const [, setTick] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 60_000);
     return () => clearInterval(id);
   }, []);
 
+  const proofRef = useRef();
+  const uploadingRef = useRef(false);
+
+  // ── Fenêtres de jours visibles ────────────────────────────────────────────
+  // FIX PRINCIPAL : on commence à i=0 (aujourd'hui) au lieu de i+1 (demain)
   const visibleDays = Array.from({ length: 7 }, (_, i) =>
     addDays(new Date(), weekOffset * 7 + i)
   );
@@ -300,6 +377,7 @@ export default function Booking() {
   const getAcompteShortcuts = () =>
     [2000, 3000, 4000, 5000, 7000, 10000].filter(v => v >= ACOMPTE_MIN && v < montantTotal);
 
+  // ── Reset complet ─────────────────────────────────────────────────────────
   const resetForm = useCallback(() => {
     setStep(1);
     setSelectedService(null);
@@ -312,9 +390,14 @@ export default function Booking() {
     setCustomAmount('');
     setBookingId(null);
     setBookingData(null);
+    setProofFile(null);
+    setProofPreview(null);
     setPaymentSent(false);
     setCreatingBooking(false);
+    setConvertingImage(false);
+    setUploading(false);
     setRedirectCountdown(null);
+    uploadingRef.current = false;
   }, []);
 
   const scrollToAccueil = useCallback(() => {
@@ -323,6 +406,7 @@ export default function Booking() {
     else window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // ── Countdown post-upload ─────────────────────────────────────────────────
   useEffect(() => {
     if (redirectCountdown === null) return;
     if (redirectCountdown <= 0) { resetForm(); scrollToAccueil(); return; }
@@ -330,6 +414,7 @@ export default function Booking() {
     return () => clearTimeout(t);
   }, [redirectCountdown, resetForm, scrollToAccueil]);
 
+  // ── Countdown annulation ──────────────────────────────────────────────────
   useEffect(() => {
     if (cancelRedirect === null) return;
     if (cancelRedirect <= 0) { setShowCancelModal(false); setCancelRedirect(null); scrollToAccueil(); return; }
@@ -337,6 +422,7 @@ export default function Booking() {
     return () => clearTimeout(t);
   }, [cancelRedirect, scrollToAccueil]);
 
+  // ── Firestore : disponibilités ────────────────────────────────────────────
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'availability'), (snap) => {
       const map = {};
@@ -348,6 +434,7 @@ export default function Booking() {
     return unsub;
   }, []);
 
+  // ── Firestore : créneaux déjà réservés ────────────────────────────────────
   useEffect(() => {
     if (!selectedDate) { setBookedSlots([]); return; }
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -362,6 +449,7 @@ export default function Booking() {
     return unsub;
   }, [selectedDate]);
 
+  // ── Créneaux dispo pour la modification ──────────────────────────────────
   useEffect(() => {
     if (!modifyForm.date) { setModifyAvailSlots([]); return; }
     const date = new Date(modifyForm.date);
@@ -369,14 +457,18 @@ export default function Booking() {
     setModifyAvailSlots(getValidSlots(date, allSlots));
   }, [modifyForm.date, availability]);
 
+  // ── isDateAvailable : tient compte des heures restantes pour aujourd'hui ──
   const isDateAvailable = useCallback((date) => {
     const ds = format(date, 'yyyy-MM-dd');
     const allSlots = availability[ds];
     if (!allSlots || allSlots.length === 0) return false;
+    // Pour aujourd'hui, vérifier qu'il reste au moins un créneau valide
     const valid = getValidSlots(date, allSlots);
     return valid.length > 0;
   }, [availability]);
 
+  // ── Créneaux disponibles pour la date sélectionnée ───────────────────────
+  // Ne retourne que les créneaux non réservés ET non passés
   const getAvailableSlots = useCallback(() => {
     if (!selectedDate) return [];
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -385,23 +477,26 @@ export default function Booking() {
     return valid.filter(slot => !bookedSlots.includes(slot));
   }, [selectedDate, availability, bookedSlots]);
 
+  // Slots bruts pour la date (pour afficher les passés barrés si besoin)
   const getRawSlotsForDate = useCallback(() => {
     if (!selectedDate) return [];
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     return availability[dateStr] || [];
   }, [selectedDate, availability]);
 
-  const openSlots = getAvailableSlots();
-  const rawSlots  = getRawSlotsForDate();
+  const openSlots  = getAvailableSlots();
+  const rawSlots   = getRawSlotsForDate();
 
+  // Aujourd'hui a des créneaux dans Firestore mais tous passés ?
   const todayHasOnlyPassedSlots = useCallback((date) => {
     if (!isToday(date)) return false;
     const ds = format(date, 'yyyy-MM-dd');
     const allSlots = availability[ds] || [];
-    if (allSlots.length === 0) return false;
+    if (allSlots.length === 0) return false; // pas de dispo du tout
     return getValidSlots(date, allSlots).length === 0;
   }, [availability]);
 
+  // ── Sélection service ─────────────────────────────────────────────────────
   const handleSelectService = (serviceId) => {
     if (selectedService !== null && selectedService !== serviceId) {
       setSelectedDate(null);
@@ -413,13 +508,37 @@ export default function Booking() {
       setWeekOffset(0);
       setBookingId(null);
       setBookingData(null);
+      setProofFile(null);
+      setProofPreview(null);
       setPaymentSent(false);
       setCreatingBooking(false);
       setRedirectCountdown(null);
+      uploadingRef.current = false;
     }
     setSelectedService(serviceId);
   };
 
+  // ── Sélection preuve — conversion JPEG ───────────────────────────────────
+  const handleProofChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setConvertingImage(true);
+    setProofFile(null);
+    setProofPreview(null);
+    try {
+      const safeFile = await convertToJpeg(file);
+      setProofFile(safeFile);
+      setProofPreview(URL.createObjectURL(safeFile));
+    } catch (err) {
+      console.error('[ProofChange] Erreur conversion:', err);
+      setProofFile(file);
+      setProofPreview(URL.createObjectURL(file));
+    } finally {
+      setConvertingImage(false);
+    }
+  };
+
+  // ── Créer réservation ─────────────────────────────────────────────────────
   const handleCreateBooking = async () => {
     if (creatingBooking) return;
     setCreatingBooking(true);
@@ -489,54 +608,77 @@ Statut : En attente d'acompte ⏳`;
     }
   };
 
-  // ── Callback UploadProof ──────────────────────────────────────────────────
-  const handleProofSuccess = async (url) => {
-    const isPaidFull = paymentType === 'total';
-    const newStatut  = isPaidFull ? 'paye_entierement' : 'acompte_paye';
-    const montant    = montantPaye;
-    const reste      = montantTotal - montant;
-    const dateStr    = format(selectedDate, 'yyyy-MM-dd');
+  // ── Envoi preuve ──────────────────────────────────────────────────────────
+  const handleSendProof = async () => {
+    if (!proofFile || uploading || convertingImage || uploadingRef.current) return;
+    if (!bookingId) return;
 
-    await updateDoc(doc(db, 'bookings', bookingId), {
-      proofUrl:           url,
-      statutPaiement:     newStatut,
-      statutReservation:  newStatut,
-      status:             newStatut,
-      montantPaye:        montant,
-      resteAPayer:        reste,
-      proofSentAt:        serverTimestamp(),
-      paymentConfirmedAt: serverTimestamp(),
-    });
+    uploadingRef.current = true;
+    setUploading(true);
 
-    const availSnap = await getDoc(doc(db, 'availability', dateStr));
-    if (availSnap.exists()) {
-      const slots = (availSnap.data().slots || []).filter(s => s !== selectedTime);
-      if (slots.length === 0) {
-        const { deleteDoc } = await import('firebase/firestore');
-        await deleteDoc(doc(db, 'availability', dateStr));
-      } else {
-        await setDoc(doc(db, 'availability', dateStr), { slots, updatedAt: serverTimestamp() }, { merge: true });
+    try {
+      const url = await uploadImage(proofFile);
+
+      const isPaidFull  = paymentType === 'total';
+      const newStatut   = isPaidFull ? 'paye_entierement' : 'acompte_paye';
+      const montant     = montantPaye;
+      const reste       = montantTotal - montant;
+      const dateStr     = format(selectedDate, 'yyyy-MM-dd');
+
+      await updateDoc(doc(db, 'bookings', bookingId), {
+        proofUrl:             url,
+        statutPaiement:       newStatut,
+        statutReservation:    newStatut,
+        status:               newStatut,
+        montantPaye:          montant,
+        resteAPayer:          reste,
+        proofSentAt:          serverTimestamp(),
+        paymentConfirmedAt:   serverTimestamp(),
+      });
+
+      const availSnap = await getDoc(doc(db, 'availability', dateStr));
+      if (availSnap.exists()) {
+        const slots = (availSnap.data().slots || []).filter(s => s !== selectedTime);
+        if (slots.length === 0) {
+          const { deleteDoc } = await import('firebase/firestore');
+          await deleteDoc(doc(db, 'availability', dateStr));
+        } else {
+          await setDoc(doc(db, 'availability', dateStr), { slots, updatedAt: serverTimestamp() }, { merge: true });
+        }
       }
+
+      const adminMsg = isPaidFull
+        ? `💰 *MAGICAL HAND — Paiement complet reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant total payé : ${montantTotal.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`
+        : `✅ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
+
+      const clientMsg = isPaidFull
+        ? `✔️ *Paiement complet reçu*\nMerci *${name}*, votre rendez-vous est entièrement réglé.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`
+        : `✔️ *Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`;
+
+      openWhatsApp(adminMsg);
+      setTimeout(() => {
+        const cleanPhone = phone.replace(/\D/g, '');
+        if (cleanPhone.length >= 8) openWhatsAppTo(cleanPhone, clientMsg);
+      }, 900);
+
+      setPaymentSent(true);
+      setRedirectCountdown(6);
+
+    } catch (err) {
+      console.error('[SendProof] Erreur:', err);
+      uploadingRef.current = false;
+      alert(
+        `Erreur lors de l'envoi de la preuve.\n\n` +
+        `Détail : ${err?.message || 'Erreur inconnue'}\n\n` +
+        `Fichier : ${proofFile?.name} (${proofFile?.type || 'type inconnu'}, ${Math.round((proofFile?.size || 0) / 1024)} Ko)\n\n` +
+        `Veuillez réessayer ou contacter Mamifa directement sur WhatsApp au +221 77 669 57 90.`
+      );
+    } finally {
+      setUploading(false);
     }
-
-    const adminMsg = isPaidFull
-      ? `💰 *MAGICAL HAND — Paiement complet reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant total payé : ${montantTotal.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`
-      : `✅ *MAGICAL HAND — Acompte reçu*\n━━━━━━━━━━━━━━━━━━━\n👤 Cliente : ${name}\n📱 ${phone}\n💋 ${service.label}\n📅 ${dateStr} à ${selectedTime}\n💳 Montant payé : ${montant.toLocaleString()} FCFA\n💰 Reste à payer le jour J : ${reste.toLocaleString()} FCFA\n━━━━━━━━━━━━━━━━━━━\nMerci de valider dans le dashboard.`;
-
-    const clientMsg = isPaidFull
-      ? `✔️ *Paiement complet reçu*\nMerci *${name}*, votre rendez-vous est entièrement réglé.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`
-      : `✔️ *Réservation confirmée*\nAcompte payé : *${montant.toLocaleString()} FCFA*\nReste à payer : *${reste.toLocaleString()} FCFA* le jour du rendez-vous.\n💋 ${service.label} — ${dateStr} à ${selectedTime}\n_Magical Hand by Mamifa_ ✨`;
-
-    openWhatsApp(adminMsg);
-    setTimeout(() => {
-      const cleanPhone = phone.replace(/\D/g, '');
-      if (cleanPhone.length >= 8) openWhatsAppTo(cleanPhone, clientMsg);
-    }, 900);
-
-    setPaymentSent(true);
-    setRedirectCountdown(6);
   };
 
+  // ── Cancel lookup ─────────────────────────────────────────────────────────
   const handleCancelLookup = async () => {
     if (!cancelBookingId.trim()) return;
     setCancelStatus('loading');
@@ -593,6 +735,7 @@ ${isFreeCancel ? 'Annulation libre — créneau automatiquement libéré.' : "Le
     } catch { setCancelStatus('error'); }
   };
 
+  // ── Modify lookup ─────────────────────────────────────────────────────────
   const handleModifyLookup = async () => {
     if (!modifyBookingId.trim()) return;
     setModifyStatus('loading');
@@ -661,6 +804,7 @@ Merci de valider dans votre dashboard.`;
 
   return (
     <section id="reserver" className="booking-section">
+      {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -696,6 +840,7 @@ Merci de valider dans votre dashboard.`;
           ))}
         </div>
 
+        {/* Step content */}
         <motion.div
           key={step}
           initial={{ opacity: 0, x: 20 }}
@@ -753,10 +898,12 @@ Merci de valider dans votre dashboard.`;
                 </button>
               </div>
 
+              {/* ── Grille calendrier ── */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: '5px' }}>
                 {visibleDays.map((date) => {
                   const isDateToday = isToday(date);
                   const avail       = isDateAvailable(date);
+                  // Une date avec uniquement des heures passées : affichée mais non cliquable
                   const passedOnly  = todayHasOnlyPassedSlots(date);
                   const ds          = format(date, 'yyyy-MM-dd');
                   const daySlots    = availability[ds] || [];
@@ -795,6 +942,7 @@ Merci de valider dans votre dashboard.`;
                         position: 'relative',
                       }}
                     >
+                      {/* Badge "Aujourd'hui" */}
                       {isDateToday && (
                         <span style={{
                           position: 'absolute', top: '-8px', left: '50%', transform: 'translateX(-50%)',
@@ -807,6 +955,7 @@ Merci de valider dans votre dashboard.`;
                           Auj.
                         </span>
                       )}
+
                       <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '8px', letterSpacing: '0.05em', textTransform: 'uppercase', color: sel ? '#0A0A0A' : '#8A7968', marginTop: isDateToday ? '6px' : '0' }}>
                         {format(date, 'EEE', { locale: fr })}
                       </span>
@@ -816,11 +965,15 @@ Merci de valider dans votre dashboard.`;
                       <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '8px', color: sel ? '#0A0A0A' : '#8A7968', textTransform: 'uppercase' }}>
                         {format(date, 'MMM', { locale: fr })}
                       </span>
+
+                      {/* Nombre de créneaux valides */}
                       {avail && validCount > 0 && (
                         <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: sel ? '#0A0A0A' : '#C9A84C', opacity: 0.8 }}>
                           {validCount} cr.
                         </span>
                       )}
+
+                      {/* Aucune dispo restante aujourd'hui */}
                       {passedOnly && (
                         <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '7px', color: '#E74C3C', opacity: 0.85 }}>
                           Complet
@@ -831,8 +984,11 @@ Merci de valider dans votre dashboard.`;
                 })}
               </div>
 
+              {/* ── Créneaux horaires ── */}
               {selectedDate && (
                 <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} style={{ marginTop: '28px' }}>
+
+                  {/* En-tête créneaux */}
                   <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', marginBottom: '14px', letterSpacing: '0.15em', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Clock size={13} color="#C9A84C" />
                     {isToday(selectedDate) ? 'Créneaux disponibles aujourd\'hui' : 'Créneaux disponibles'}
@@ -1046,7 +1202,6 @@ Merci de valider dans votre dashboard.`;
             <div>
               {!paymentSent ? (
                 <>
-                  {/* Bandeau N° réservation + countdown */}
                   <div style={{ padding: '16px 20px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '6px', marginBottom: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
                       <div>
@@ -1061,7 +1216,6 @@ Merci de valider dans votre dashboard.`;
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', margin: '10px 0 0', opacity: 0.7 }}>⚠️ Conservez ce numéro. Votre créneau sera libéré sans paiement dans le délai.</p>
                   </div>
 
-                  {/* Instructions de paiement */}
                   <div style={{ padding: '20px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px', marginBottom: '24px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '16px' }}>Instructions de paiement</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1079,13 +1233,42 @@ Merci de valider dans votre dashboard.`;
                     </div>
                   </div>
 
-                  {/* ── Composant UploadProof ── */}
-                  <UploadProof
-                    onSuccess={handleProofSuccess}
-                    bookingId={bookingId}
-                    clientName={name}
-                    amount={`${montantPaye.toLocaleString()} FCFA`}
-                  />
+                  <div style={{ marginBottom: '20px' }}>
+                    <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '12px' }}>Preuve de paiement *</p>
+                    <div
+                      onClick={() => !convertingImage && proofRef.current?.click()}
+                      style={{ border: proofPreview ? '1px solid rgba(201,168,76,0.5)' : '2px dashed rgba(201,168,76,0.25)', borderRadius: '6px', padding: proofPreview ? '0' : '32px', cursor: convertingImage ? 'wait' : 'pointer', transition: 'all 0.3s', textAlign: 'center', overflow: 'hidden', background: 'rgba(255,255,255,0.02)' }}
+                      onMouseEnter={e => { if (!proofPreview && !convertingImage) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.6)'; }}
+                      onMouseLeave={e => { if (!proofPreview) e.currentTarget.style.borderColor = 'rgba(201,168,76,0.25)'; }}
+                    >
+                      <input ref={proofRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handleProofChange} />
+                      {convertingImage ? (
+                        <div style={{ padding: '20px 0' }}>
+                          <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} style={{ width: '28px', height: '28px', border: '2px solid rgba(201,168,76,0.2)', borderTopColor: '#C9A84C', borderRadius: '50%', margin: '0 auto 12px' }} />
+                          <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968', margin: 0 }}>Traitement de l'image…</p>
+                        </div>
+                      ) : proofPreview ? (
+                        <div style={{ position: 'relative' }}>
+                          <img src={proofPreview} alt="Preuve" style={{ width: '100%', maxHeight: '220px', objectFit: 'cover', display: 'block' }} />
+                          <div style={{ position: 'absolute', bottom: '10px', right: '10px', background: 'rgba(10,10,10,0.8)', borderRadius: '4px', padding: '6px 12px', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C' }}>Cliquer pour changer</div>
+                        </div>
+                      ) : (
+                        <div>
+                          <Upload size={28} color="#C9A84C" style={{ marginBottom: '12px', opacity: 0.7 }} />
+                          <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', color: '#8A7968', margin: 0 }}>Cliquer pour uploader la preuve de paiement</p>
+                          <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', opacity: 0.5, marginTop: '6px' }}>PNG, JPG, HEIC — Max 5MB</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <motion.button onClick={handleSendProof} disabled={!proofFile || uploading || convertingImage}
+                    whileHover={proofFile && !uploading && !convertingImage ? { scale: 1.03, boxShadow: '0 8px 30px rgba(37,211,102,0.3)' } : {}}
+                    style={{ width: '100%', padding: '18px', background: proofFile && !uploading && !convertingImage ? 'linear-gradient(135deg, #25D366, #128C7E)' : 'rgba(255,255,255,0.05)', color: proofFile && !uploading && !convertingImage ? '#FFFFFF' : '#8A7968', border: 'none', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '13px', letterSpacing: '0.2em', textTransform: 'uppercase', fontWeight: 600, cursor: proofFile && !uploading && !convertingImage ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                  >
+                    <MessageCircle size={18} />
+                    {uploading ? 'Envoi en cours...' : convertingImage ? 'Traitement…' : 'Envoyer la preuve'}
+                  </motion.button>
                 </>
               ) : (
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} style={{ textAlign: 'center', padding: '20px 0' }}>
@@ -1165,7 +1348,7 @@ Merci de valider dans votre dashboard.`;
         </div>
       </div>
 
-      {/* ── Cancel Modal ── */}
+      {/* ── Cancel Modal ──────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showCancelModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -1295,7 +1478,7 @@ Merci de valider dans votre dashboard.`;
         )}
       </AnimatePresence>
 
-      {/* ── Modify Modal ── */}
+      {/* ── Modify Modal ──────────────────────────────────────────────────────── */}
       <AnimatePresence>
         {showModifyModal && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
