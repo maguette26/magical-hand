@@ -5,59 +5,47 @@ const SERVICES = [
   {
     id: 1,
     title: 'Maquillage simple',
-    subtitle: 'Soft Glam',
-    price: '7 000 FCFA',
+    subtitle: 'simple',
+    price: ' 7 000 FCFA',
     priceShort: '7k',
-    description: 'Remise en beauté rapide, teint frais et naturel — idéal pour la fête.',
-    features: ['Teint frais et naturel', 'Lèvres ravivées', 'Finition légère', 'Idéal pour la fête'],
-    tag: 'Naturel & Élégant',
+    description: 'Remise en beauté rapide pour un éclat instantané.',
+    features: ['Peau fraîche', 'Lèvres ravivées', 'Finition naturelle'],
+    tag: 'Simplicité',
     tagColor: '#8A7968',
   },
   {
     id: 2,
     title: 'Maquillage Complet',
-    subtitle: 'Pack Queen',
+    subtitle: 'Full Glam — 10 Mil',
     price: '10 000 FCFA',
     priceShort: '10k',
     description: 'Un look complet et sublimé, prête à briller.',
-    features: ['Makeup complet', 'Contouring glow', 'Regard glamour', 'Longue tenue'],
-    tag: 'Queen & Irrésistible',
+    features: ['Base parfaite', 'Yeux travaillés', 'Lèvres définies', 'Contouring'],
+    tag: 'Populaire',
     tagColor: '#C9A84C',
     featured: true,
   },
   {
     id: 3,
     title: 'Maquillage + Shooting',
-    subtitle: 'Sagnsé Glam',
+    subtitle: 'Beauty & Photo',
     price: '15 000 FCFA',
     priceShort: '15k',
-    description: 'Maquillage professionnel avec shooting photo et vidéo inclus.',
-    features: ['Makeup complet', 'Shooting photo', 'Vidéo cinématique', 'Rendu premium'],
-    tag: 'Beauté & Souvenirs',
+    description: 'Maquillage professionnel avec séance photo incluse.',
+    features: ['Look photo-ready', 'Séance shooting', 'Photos retouchées', 'Rendu premium'],
+    tag: 'Shooting',
     tagColor: '#D4956A',
   },
   {
     id: 4,
-    title: 'Pack Gold Eid',
-    subtitle: "L'Expérience Ultime ✨",
-    price: '20 000 FCFA',
-    priceShort: '20k',
-    description: "Transformation complète pour briller lors de l'Aïd — makeup luxe, coiffure et vidéo pro.",
-    features: ['Makeup complet luxe', 'Coiffure incluse', 'Photo & vidéo pro', 'Transformation complète'],
-    tag: "L'Expérience Ultime",
-    tagColor: '#E8C97A',
-    goldEid: true,
-  },
-  {
-    id: 5,
     title: 'Cérémonie',
     subtitle: 'Henné · Baptême · Mariage',
-    price: 'À partir de 25 000 FCFA',
+    price: ' 25 000 FCFA',
     priceShort: '25k+',
     description: 'Pour vos grands jours — mariage, baptême, cérémonie culturelle.',
     features: ['Consultation style', 'Durabilité longue', 'Maquillage résistant', 'Finition luxe'],
-    tag: 'Premium Royal',
-    tagColor: '#C9A84C',
+    tag: 'Premium',
+    tagColor: '#E8C97A',
   },
 ];
 
@@ -109,7 +97,7 @@ export default function Services() {
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
         gap: '20px',
-        maxWidth: '1300px',
+        maxWidth: '1200px',
         margin: '0 auto',
       }}>
         {SERVICES.map((s, i) => (
@@ -119,23 +107,17 @@ export default function Services() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6, delay: i * 0.1 }}
-            whileHover={{ y: -6, boxShadow: s.goldEid
-              ? '0 20px 60px rgba(232,201,122,0.35)'
-              : s.featured
-                ? '0 20px 60px rgba(201,168,76,0.3)'
-                : '0 20px 60px rgba(0,0,0,0.4)'
+            whileHover={{ y: -6, boxShadow: s.featured
+              ? '0 20px 60px rgba(201,168,76,0.3)'
+              : '0 20px 60px rgba(0,0,0,0.4)'
             }}
             style={{
-              background: s.goldEid
-                ? 'linear-gradient(160deg, #1C1810 0%, #251E10 60%, #1C1810 100%)'
-                : s.featured
-                  ? 'linear-gradient(160deg, #1A1714 0%, #2A2118 100%)'
-                  : 'linear-gradient(160deg, #111 0%, #1A1714 100%)',
-              border: s.goldEid
-                ? '1px solid rgba(232,201,122,0.6)'
-                : s.featured
-                  ? '1px solid rgba(201,168,76,0.5)'
-                  : '1px solid rgba(201,168,76,0.12)',
+              background: s.featured
+                ? 'linear-gradient(160deg, #1A1714 0%, #2A2118 100%)'
+                : 'linear-gradient(160deg, #111 0%, #1A1714 100%)',
+              border: s.featured
+                ? '1px solid rgba(201,168,76,0.5)'
+                : '1px solid rgba(201,168,76,0.12)',
               borderRadius: '4px',
               padding: '40px 32px',
               position: 'relative',
@@ -154,43 +136,23 @@ export default function Services() {
               padding: '4px 12px',
               borderRadius: '2px',
               fontFamily: 'Jost, sans-serif',
-              fontSize: '9px',
-              letterSpacing: '0.14em',
+              fontSize: '10px',
+              letterSpacing: '0.18em',
               textTransform: 'uppercase',
             }}>
               {s.tag}
             </div>
 
-            {/* Top accent line */}
-            {(s.featured || s.goldEid) && (
+            {/* Gold accent line */}
+            {s.featured && (
               <div style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
                 height: '2px',
-                background: s.goldEid
-                  ? 'linear-gradient(90deg, transparent, #E8C97A, #C9A84C, #E8C97A, transparent)'
-                  : 'linear-gradient(90deg, transparent, #C9A84C, transparent)',
+                background: 'linear-gradient(90deg, transparent, #C9A84C, transparent)',
               }} />
-            )}
-
-            {/* Gold Eid shimmer corner decoration */}
-            {s.goldEid && (
-              <>
-                <div style={{
-                  position: 'absolute', top: 0, left: 0,
-                  width: '60px', height: '60px',
-                  background: 'radial-gradient(circle at top left, rgba(232,201,122,0.12), transparent 70%)',
-                  pointerEvents: 'none',
-                }} />
-                <div style={{
-                  position: 'absolute', bottom: 0, right: 0,
-                  width: '80px', height: '80px',
-                  background: 'radial-gradient(circle at bottom right, rgba(201,168,76,0.1), transparent 70%)',
-                  pointerEvents: 'none',
-                }} />
-              </>
             )}
 
             {/* Price big */}
@@ -198,7 +160,7 @@ export default function Services() {
               fontFamily: 'Cormorant Garamond, serif',
               fontSize: '48px',
               fontWeight: 500,
-              color: s.goldEid ? '#E8C97A' : s.featured ? '#C9A84C' : '#E8C97A',
+              color: s.featured ? '#C9A84C' : '#E8C97A',
               lineHeight: 1,
               marginBottom: '8px',
             }}>
@@ -227,7 +189,7 @@ export default function Services() {
               fontFamily: 'Jost, sans-serif',
               fontSize: '11px',
               letterSpacing: '0.1em',
-              color: s.goldEid ? '#E8C97A' : '#C9A84C',
+              color: '#C9A84C',
               textTransform: 'uppercase',
               marginBottom: '20px',
             }}>
@@ -246,7 +208,7 @@ export default function Services() {
             </p>
 
             {/* Features */}
-            <ul style={{ listStyle: 'none', marginBottom: '36px', padding: 0 }}>
+            <ul style={{ listStyle: 'none', marginBottom: '36px' }}>
               {s.features.map((f) => (
                 <li key={f} style={{
                   display: 'flex',
@@ -259,7 +221,7 @@ export default function Services() {
                   padding: '6px 0',
                   borderBottom: '1px solid rgba(201,168,76,0.06)',
                 }}>
-                  <span style={{ color: s.goldEid ? '#E8C97A' : '#C9A84C', fontSize: '14px' }}>✦</span>
+                  <span style={{ color: '#C9A84C', fontSize: '14px' }}>✦</span>
                   {f}
                 </li>
               ))}
@@ -272,25 +234,22 @@ export default function Services() {
               style={{
                 width: '100%',
                 padding: '14px',
-                background: s.goldEid
-                  ? 'linear-gradient(135deg, #E8C97A, #C9A84C, #E8C97A)'
-                  : s.featured
-                    ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
-                    : 'transparent',
-                color: (s.featured || s.goldEid) ? '#0A0A0A' : '#C9A84C',
-                border: (s.featured || s.goldEid) ? 'none' : '1px solid rgba(201,168,76,0.4)',
+                background: s.featured
+                  ? 'linear-gradient(135deg, #C9A84C, #E8C97A)'
+                  : 'transparent',
+                color: s.featured ? '#0A0A0A' : '#C9A84C',
+                border: s.featured ? 'none' : '1px solid rgba(201,168,76,0.4)',
                 borderRadius: '2px',
                 fontFamily: 'Jost, sans-serif',
                 fontSize: '11px',
                 letterSpacing: '0.2em',
                 textTransform: 'uppercase',
-                fontWeight: (s.featured || s.goldEid) ? 600 : 400,
+                fontWeight: s.featured ? 600 : 400,
                 cursor: 'pointer',
                 transition: 'all 0.3s',
-                boxShadow: s.goldEid ? '0 4px 20px rgba(232,201,122,0.25)' : 'none',
               }}
             >
-              {s.goldEid ? '✦ Réserver ce Pack ✦' : 'Réserver'}
+              Réserver
             </motion.button>
           </motion.div>
         ))}

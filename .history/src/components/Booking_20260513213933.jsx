@@ -10,7 +10,7 @@ import { fr } from 'date-fns/locale';
 import {
   Sparkles, Camera, Crown, Clock, ChevronLeft, ChevronRight,
   MessageCircle, CreditCard, Check, Wand2, AlertCircle,
-  CheckCircle2, XCircle, ArrowRight, Images, Edit3, Calendar, Star
+  CheckCircle2, XCircle, ArrowRight, Images, Edit3, Calendar
 } from 'lucide-react';
 import UploadProof from '../components/UploadProof';
 
@@ -20,11 +20,10 @@ const PAYMENT_EXPIRY_HOURS = 24;
 const POST_PAYMENT_REDIRECT_DELAY = 8000;
 
 const SERVICES = [
-  { id: 1, label: 'Maquillage Simple — Soft Glam',        price: '7 000 FCFA',          montantTotal: 7000,  description: 'Look naturel et soigné, teint frais — idéal pour la fête',           Icon: Wand2 },
-  { id: 2, label: 'Maquillage Complet Glam — Pack Queen', price: '10 000 FCFA',         montantTotal: 10000, description: 'Makeup complet, contouring glow, regard glamour — longue tenue',      Icon: Sparkles },
-  { id: 3, label: 'Maquillage + Shooting Photo',          price: '15 000 FCFA',         montantTotal: 15000, description: 'Makeup pro + shooting photo + vidéo cinématique inclus',             Icon: Camera },
-  { id: 4, label: 'Pack Gold Eid ✨',                     price: '20 000 FCFA',         montantTotal: 20000, description: 'Makeup complet luxe · Coiffure incluse · Photo & vidéo pro · Transformation complète', Icon: Star },
-  { id: 5, label: 'Cérémonie — Henné / Baptême / Mariage', price: 'À partir de 25 000 FCFA', montantTotal: 25000, description: 'Look royal garanti · Retouche express disponible en supplément (+5 000 FCFA)', Icon: Crown },
+  { id: 1, label: 'Maquillage Simple',               price: '7 000 FCFA',          montantTotal: 7000,  description: 'Look naturel et soigné, idéal pour le quotidien',        Icon: Wand2 },
+  { id: 2, label: 'Maquillage Complet Glam',          price: '10 000 FCFA',         montantTotal: 10000, description: 'Look complet, longue tenue, éclat assuré',               Icon: Sparkles },
+  { id: 3, label: 'Maquillage + Shooting Photo',      price: '15 000 FCFA',         montantTotal: 15000, description: 'Maquillage pro + séance photo incluse',                  Icon: Camera },
+  { id: 4, label: 'Cérémonie — Henné / Baptême / Mariage', price: 'À partir de 25 000 FCFA', montantTotal: 25000, description: 'Look royal garanti · Retouche express disponible en supplément (+5 000 FCFA)', Icon: Crown },
 ];
 
 export const PAYMENT_STATUS_LABEL = {
@@ -713,53 +712,19 @@ Merci de valider dans votre dashboard.`;
                 {SERVICES.map((s) => {
                   const active = selectedService === s.id;
                   const { Icon } = s;
-                  // Pack Gold Eid gets a special gold shimmer border
-                  const isGoldEid = s.id === 4;
                   return (
                     <motion.button key={s.id} onClick={() => handleSelectService(s.id)} whileHover={{ x: 4 }}
-                      style={{
-                        background: active
-                          ? isGoldEid
-                            ? 'linear-gradient(135deg, rgba(232,201,122,0.18), rgba(201,168,76,0.10))'
-                            : 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(232,201,122,0.07))'
-                          : isGoldEid
-                            ? 'rgba(232,201,122,0.04)'
-                            : 'rgba(255,255,255,0.02)',
-                        border: active
-                          ? isGoldEid ? '1px solid rgba(232,201,122,0.85)' : '1px solid rgba(201,168,76,0.65)'
-                          : isGoldEid ? '1px solid rgba(232,201,122,0.35)' : '1px solid rgba(201,168,76,0.12)',
-                        borderRadius: '6px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px',
-                        cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', width: '100%',
-                        position: 'relative', overflow: 'hidden',
-                      }}
+                      style={{ background: active ? 'linear-gradient(135deg, rgba(201,168,76,0.15), rgba(232,201,122,0.07))' : 'rgba(255,255,255,0.02)', border: active ? '1px solid rgba(201,168,76,0.65)' : '1px solid rgba(201,168,76,0.12)', borderRadius: '6px', padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.3s', width: '100%' }}
                     >
-                      {/* Gold Eid top shimmer line */}
-                      {isGoldEid && (
-                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, transparent, #E8C97A, #C9A84C, #E8C97A, transparent)' }} />
-                      )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <div style={{
-                          width: '40px', height: '40px', borderRadius: '50%',
-                          background: active
-                            ? isGoldEid ? 'linear-gradient(135deg, #E8C97A, #C9A84C)' : 'linear-gradient(135deg, #C9A84C, #E8C97A)'
-                            : isGoldEid ? 'rgba(232,201,122,0.15)' : 'rgba(201,168,76,0.1)',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          flexShrink: 0, transition: 'all 0.3s',
-                        }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: active ? 'linear-gradient(135deg, #C9A84C, #E8C97A)' : 'rgba(201,168,76,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.3s' }}>
                           <Icon size={18} strokeWidth={1.5} color={active ? '#0A0A0A' : '#C9A84C'} />
                         </div>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', fontWeight: 600, color: active ? '#FAF6EF' : '#D4C9B8', letterSpacing: '0.02em' }}>{s.label}</div>
-                          {isGoldEid && (
-                            <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '9px', letterSpacing: '0.2em', textTransform: 'uppercase', color: '#E8C97A', marginTop: '2px' }}>
-                              ✦ L'expérience ultime
-                            </div>
-                          )}
-                        </div>
+                        <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '13px', fontWeight: 600, color: active ? '#FAF6EF' : '#D4C9B8', letterSpacing: '0.02em', flex: 1 }}>{s.label}</div>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '10px', paddingLeft: '52px' }}>
                         <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968', lineHeight: 1.4, flex: 1 }}>{s.description}</div>
-                        <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '15px', color: active ? (isGoldEid ? '#E8C97A' : '#E8C97A') : '#C9A84C', whiteSpace: 'nowrap', fontWeight: 500, flexShrink: 0 }}>{s.price}</div>
+                        <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '15px', color: active ? '#E8C97A' : '#C9A84C', whiteSpace: 'nowrap', fontWeight: 500, flexShrink: 0 }}>{s.price}</div>
                       </div>
                     </motion.button>
                   );
@@ -1081,6 +1046,7 @@ Merci de valider dans votre dashboard.`;
             <div>
               {!paymentSent ? (
                 <>
+                  {/* Bandeau N° réservation + countdown */}
                   <div style={{ padding: '16px 20px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '6px', marginBottom: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
                       <div>
@@ -1095,6 +1061,7 @@ Merci de valider dans votre dashboard.`;
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968', margin: '10px 0 0', opacity: 0.7 }}>⚠️ Conservez ce numéro. Votre créneau sera libéré sans paiement dans le délai.</p>
                   </div>
 
+                  {/* Instructions de paiement */}
                   <div style={{ padding: '20px', background: 'rgba(201,168,76,0.04)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '6px', marginBottom: '24px' }}>
                     <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '16px' }}>Instructions de paiement</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -1112,6 +1079,7 @@ Merci de valider dans votre dashboard.`;
                     </div>
                   </div>
 
+                  {/* ── Composant UploadProof ── */}
                   <UploadProof
                     onSuccess={handleProofSuccess}
                     bookingId={bookingId}
