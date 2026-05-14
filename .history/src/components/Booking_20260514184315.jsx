@@ -676,7 +676,7 @@ Merci de valider dans votre dashboard.`;
         <div style={{ width: '40px', height: '1px', background: 'linear-gradient(90deg, transparent, #C9A84C, transparent)', margin: '0 auto 24px' }} />
         <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '14px', color: '#8A7968', maxWidth: '440px', margin: '0 auto' }}>
           Choisissez votre prestation, votre date, et sécurisez votre réservation avec un acompte (obligatoire) minimum de {ACOMPTE_MIN.toLocaleString()} FCFA.<br/>
-          ⚠️ L’acompte doit être payé avant un délai de 24h après la réservation. Passé ce délai, le créneau sera automatiquement libéré et la réservation annulée.
+          
         </p>
       </motion.div>
 
