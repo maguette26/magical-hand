@@ -32,6 +32,8 @@ const AUTO_DELETE_AFTER_DAYS = 60;
 const REMINDER_HOURS_BEFORE = 24;
 
 // ─── Status normalisation ─────────────────────────────────────────────────────
+// Les réservations créées depuis Booking.jsx utilisent les anciens statuts FR.
+// On les normalise vers les statuts EN utilisés dans l'admin.
 const STATUS_NORMALIZE = {
   en_attente_paiement: 'pending_payment',
   acompte_paye:        'waiting_confirmation',
@@ -41,11 +43,13 @@ const STATUS_NORMALIZE = {
   modification_demandee: 'waiting_confirmation',
 };
 
+// Retourne toujours un statut normalisé EN
 function getEffectiveStatus(b) {
   const raw = b.status || b.statutReservation || 'pending_payment';
   return STATUS_NORMALIZE[raw] || raw;
 }
 
+// Vérifie si un statut (brut ou normalisé) appartient à un groupe
 function statusIn(b, ...statuses) {
   return statuses.includes(getEffectiveStatus(b));
 }
@@ -142,8 +146,6 @@ function notifyWA(booking, type, extra = {}) {
     rescheduled: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nVotre rendez-vous a été *déplacé* 📅\n\n💋 Prestation : ${booking.service}\n📅 Nouveau créneau : ${date} à ${time} \n\nPour toute question, répondez à ce message.\n_Magical Hand by Mamifa_ ✨`,
     reminder: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nRappel : votre rendez-vous est *demain* !\n\n💋 Prestation : ${booking.service}\n📅 Date : ${date}\n🕐 Heure : ${time}\n\nNous vous attendons !\n_Magical Hand by Mamifa_ ✨`,
     cancellation_rejected: `✨ *MAGICAL HAND BY MAMIFA* ✨\nBonjour *${name}*, votre demande d'annulation n'a pas pu être acceptée. Votre rendez-vous du *${date} à ${time}* est maintenu. Contactez-nous pour plus d'informations.`,
-    // ── NOUVEAU : message automatique d'expiration après 24h sans paiement ──
-    expired: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nNous n'avons pas reçu votre acompte dans les 24 heures suivant votre réservation.\n\n📅 Créneau : ${date} à ${time}\n💋 Prestation : ${booking.service}\n\nVotre réservation a été automatiquement *annulée* et le créneau libéré.\n\n✨ D'autres créneaux sont disponibles — n'hésitez pas à réserver à nouveau !\n\n_Magical Hand by Mamifa_ 💄`,
   };
   const url = buildWhatsApp(booking.phone, templates[type]);
   if (url) window.open(url, '_blank');
@@ -166,6 +168,7 @@ function getResteAPayer(b) {
   return 0;
 }
 
+// Statuts "inactifs" (ne bloquent pas un créneau, ne comptent pas dans actives)
 const INACTIVE_STATUSES = ['cancelled', 'expired', 'archived', 'completed'];
 
 function isInactive(b) {
@@ -444,6 +447,7 @@ function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, a
       {isCancelReq && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #E74C3C, transparent)' }} />}
       {isDueSoon && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #C9A84C, transparent)' }} />}
 
+      {/* Card header */}
       <div style={{ padding: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -471,6 +475,7 @@ function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, a
         )}
       </div>
 
+      {/* Toggle expand */}
       <button onClick={() => setExpanded(e => !e)}
         style={{ width: '100%', padding: '10px 16px', background: 'rgba(201,168,76,0.04)', border: 'none', borderTop: '1px solid rgba(201,168,76,0.08)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontFamily: 'Jost, sans-serif', fontSize: '10px', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#8A7968' }}>
         {expanded ? 'Masquer actions' : 'Voir actions'}
@@ -479,6 +484,7 @@ function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, a
         </motion.span>
       </button>
 
+      {/* Actions panel */}
       <AnimatePresence>
         {expanded && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: 'hidden' }}>
@@ -553,6 +559,7 @@ function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, a
               )}
             </div>
 
+            {/* Meta info */}
             <div style={{ padding: '0 16px 14px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '9px', color: '#444' }}>#{b.id?.slice(0, 8)}</span>
               {b.createdAt?.toDate && (
@@ -632,6 +639,7 @@ export default function Admin() {
     const interval = setInterval(async () => {
       const now = new Date();
       const toExpire = bookings.filter(b => {
+        // Statut en attente de paiement (toutes variantes)
         if (getEffectiveStatus(b) !== 'pending_payment') return false;
         const created = b.createdAt?.toDate?.();
         if (!created) return false;
@@ -645,8 +653,6 @@ export default function Admin() {
         });
         await freeSlotInAvailability(b.date, b.time);
         await addBookingHistory(b.id, 'Expiré automatiquement (délai paiement dépassé)');
-        // ── NOUVEAU : notifier le client par WhatsApp que son RDV a expiré ──
-        notifyWA(b, 'expired');
         toast(`⏱ RDV de ${b.name} expiré automatiquement`, { icon: '🕐' });
       }
     }, 60_000);
@@ -657,6 +663,7 @@ export default function Admin() {
   useEffect(() => {
     const toComplete = bookings.filter(b => {
       const s = getEffectiveStatus(b);
+      // confirmed ou waiting_confirmation (acompte payé) dont le créneau est passé
       if (!['confirmed', 'waiting_confirmation'].includes(s)) return false;
       try {
         const dt = parseISO(`${b.date}T${b.time}:00`);
@@ -701,6 +708,7 @@ export default function Admin() {
   // ─── Slot helpers ────────────────────────────────────────────────────────────
   const getSlotsForDate = (dateStr) => availability[dateStr]?.slots || [];
 
+  // Créneaux bloqués = réservations actives (ni annulées, ni expirées, ni archivées)
   const getBookedSlotsForDate = (dateStr) =>
     bookings
       .filter(b => b.date === dateStr && !isInactive(b))
@@ -798,6 +806,7 @@ export default function Admin() {
 
   const updateBookingStatus = async (id, status) => {
     const booking = bookings.find(b => b.id === id);
+    // On écrit toujours les deux champs pour maintenir la compatibilité
     const statusFR = { confirmed: 'confirmed', cancelled: 'annule', expired: 'expire' }[status] || status;
     await updateDoc(doc(db, 'bookings', id), {
       status,
@@ -855,6 +864,7 @@ export default function Admin() {
     const montantPayeNum = form.montantPaye ? Number(form.montantPaye) : getMontantPaye(b);
     const montantTotalNum = form.montantTotal ? Number(form.montantTotal) : getMontantTotal(b);
     const resteNum = Math.max(0, montantTotalNum - montantPayeNum);
+    // Maintenir compatibilité : écrire les deux champs de statut
     const statusFR = STATUS_NORMALIZE[form.status] ? form.status : (Object.entries(STATUS_NORMALIZE).find(([, v]) => v === form.status)?.[0] || form.status);
     await updateDoc(doc(db, 'bookings', b.id), {
       name: form.name, phone: form.phone, service: form.service,
@@ -907,6 +917,7 @@ export default function Admin() {
   const totalAvailableSlots = Object.values(availability).reduce((acc, d) => acc + (d.slots?.length || 0), 0);
   const totalAvailableDays = Object.keys(availability).length;
 
+  // Toutes variantes "preuve envoyée"
   const pendingProofs = bookings.filter(b => getEffectiveStatus(b) === 'waiting_confirmation').length;
   const pendingCancels = bookings.filter(b => getEffectiveStatus(b) === 'cancellation_requested').length;
   const activeBookings = bookings.filter(b => !isInactive(b)).length;
@@ -1323,7 +1334,7 @@ export default function Admin() {
                 </button>
               </div>
 
-              {/* Status filters */}
+              {/* Status filters — utilise les statuts normalisés EN */}
               <div style={{ display: 'flex', gap: '6px', marginBottom: '20px', overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: '4px' }}>
                 {[
                   null,
