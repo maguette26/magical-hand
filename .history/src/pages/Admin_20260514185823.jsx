@@ -115,24 +115,6 @@ async function freeSlotInAvailability(date, time) {
   } catch (err) { console.error('freeSlot error:', err); }
 }
 
-async function occupySlotInAvailability(date, time) {
-  if (!date || !time) return;
-  try {
-    const availRef = doc(db, 'availability', date);
-    const snap = await getDoc(availRef);
-    if (!snap.exists()) return;
-    const slots = snap.data().slots || [];
-    if (slots.includes(time)) {
-      const updated = slots.filter(s => s !== time);
-      if (updated.length === 0) {
-        await deleteDoc(availRef).catch(() => {});
-      } else {
-        await setDoc(availRef, { slots: updated, updatedAt: serverTimestamp() }, { merge: true });
-      }
-    }
-  } catch (err) { console.error('occupySlot error:', err); }
-}
-
 async function addBookingHistory(bookingId, action, details = {}) {
   try {
     await addDoc(collection(db, 'bookings', bookingId, 'history'), {
@@ -160,8 +142,8 @@ function notifyWA(booking, type, extra = {}) {
     rescheduled: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nVotre rendez-vous a été *déplacé* 📅\n\n💋 Prestation : ${booking.service}\n📅 Nouveau créneau : ${date} à ${time} \n\nPour toute question, répondez à ce message.\n_Magical Hand by Mamifa_ ✨`,
     reminder: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nRappel : votre rendez-vous est *demain* !\n\n💋 Prestation : ${booking.service}\n📅 Date : ${date}\n🕐 Heure : ${time}\n\nNous vous attendons !\n_Magical Hand by Mamifa_ ✨`,
     cancellation_rejected: `✨ *MAGICAL HAND BY MAMIFA* ✨\nBonjour *${name}*, votre demande d'annulation n'a pas pu être acceptée. Votre rendez-vous du *${date} à ${time}* est maintenu. Contactez-nous pour plus d'informations.`,
+    // ── NOUVEAU : message automatique d'expiration après 24h sans paiement ──
     expired: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nNous n'avons pas reçu votre acompte dans les 24 heures suivant votre réservation.\n\n📅 Créneau : ${date} à ${time}\n💋 Prestation : ${booking.service}\n\nVotre réservation a été automatiquement *annulée* et le créneau libéré.\n\n✨ D'autres créneaux sont disponibles — n'hésitez pas à réserver à nouveau !\n\n_Magical Hand by Mamifa_ 💄`,
-    restored: `✨ *MAGICAL HAND BY MAMIFA* ✨\n━━━━━━━━━━━━━━━━━━━\nBonjour *${name}* 💄\n\nBonne nouvelle ! Votre rendez-vous a été *rétabli* ✅\n\n💋 Prestation : ${booking.service}\n📅 Date : ${date}\n🕐 Heure : ${time}\n\nNous vous attendons avec plaisir !\n_Magical Hand by Mamifa_ ✨`,
   };
   const url = buildWhatsApp(booking.phone, templates[type]);
   if (url) window.open(url, '_blank');
@@ -442,113 +424,14 @@ function EditBookingModal({ booking, bookings, availability, onClose, onSave }) 
   );
 }
 
-// ─── RestoreModal ─────────────────────────────────────────────────────────────
-function RestoreModal({ booking, onClose, onRestore }) {
-  const hasPaid = getMontantPaye(booking) > 0;
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 9999 }}>
-      <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 30 }}
-        onClick={e => e.stopPropagation()}
-        style={{ width: '100%', maxWidth: '600px', background: 'linear-gradient(160deg, #111 0%, #1A1714 100%)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '16px 16px 0 0', padding: '28px 20px' }}>
-        <div style={{ width: '40px', height: '4px', background: 'rgba(201,168,76,0.3)', borderRadius: '2px', margin: '0 auto 20px' }} />
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px' }}>
-          <RotateCcw size={16} color="#25D366" />
-          <h3 style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '22px', color: '#FAF6EF', margin: 0 }}>
-            Restaurer le RDV
-          </h3>
-        </div>
-
-        {/* Booking summary */}
-        <div style={{ padding: '14px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '6px', marginBottom: '20px' }}>
-          <div style={{ fontFamily: 'Cormorant Garamond, serif', fontSize: '18px', color: '#FAF6EF', marginBottom: '6px' }}>{booking.name}</div>
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#C9A84C', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Calendar size={10} /> {booking.date} · {booking.time}
-            </span>
-            <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#8A7968' }}>{booking.service}</span>
-          </div>
-          {hasPaid && (
-            <div style={{ marginTop: '8px', fontFamily: 'Jost, sans-serif', fontSize: '11px', color: '#25D366' }}>
-              ✓ Acompte payé : {getMontantPaye(booking).toLocaleString()} FCFA
-            </div>
-          )}
-        </div>
-
-        <p style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#8A7968', marginBottom: '18px', lineHeight: 1.6 }}>
-          Choisissez le statut de restauration. Le créneau sera automatiquement <strong style={{ color: '#FAF6EF' }}>réservé</strong> dans les disponibilités.
-        </p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-          {/* Restore as confirmed */}
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onRestore(booking, 'confirmed', true)}
-            style={{ padding: '14px 16px', background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.3)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#25D366', fontWeight: 600, marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Check size={12} /> Restaurer — Confirmé
-              </div>
-              <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968' }}>
-                RDV directement confirmé + notif WhatsApp client
-              </div>
-            </div>
-            <ChevronRight size={14} color="#25D366" />
-          </motion.button>
-
-          {/* Restore as pending payment */}
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onRestore(booking, 'pending_payment', false)}
-            style={{ padding: '14px 16px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#C9A84C', fontWeight: 600, marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Clock size={12} /> Restaurer — En attente paiement
-              </div>
-              <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968' }}>
-                Remet en attente d'acompte, sans notification
-              </div>
-            </div>
-            <ChevronRight size={14} color="#C9A84C" />
-          </motion.button>
-
-          {/* Restore as waiting confirmation */}
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={() => onRestore(booking, 'waiting_confirmation', false)}
-            style={{ padding: '14px 16px', background: 'rgba(232,164,76,0.06)', border: '1px solid rgba(232,164,76,0.2)', borderRadius: '6px', cursor: 'pointer', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '12px', color: '#E8A44C', fontWeight: 600, marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Eye size={12} /> Restaurer — Preuve envoyée
-              </div>
-              <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#8A7968' }}>
-                À confirmer manuellement, sans notification
-              </div>
-            </div>
-            <ChevronRight size={14} color="#E8A44C" />
-          </motion.button>
-        </div>
-
-        <button onClick={onClose} style={{ width: '100%', padding: '12px', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#8A7968', borderRadius: '2px', fontFamily: 'Jost, sans-serif', fontSize: '11px', letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', paddingBottom: '24px' }}>
-          Annuler
-        </button>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 // ─── BookingCard (mobile-optimized) ──────────────────────────────────────────
-function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, acceptCancellation, rejectCancellation, setReassignModal, releaseSlot, expireBooking, archiveBooking, deleteBookingPermanently, setProofViewer, setRestoreModal }) {
+function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, acceptCancellation, rejectCancellation, setReassignModal, releaseSlot, expireBooking, archiveBooking, deleteBookingPermanently, setProofViewer }) {
   const [expanded, setExpanded] = useState(false);
   const effectiveStatus = getEffectiveStatus(b);
   const isCancelReq = effectiveStatus === 'cancellation_requested';
   const isWaiting = effectiveStatus === 'waiting_confirmation';
   const isCompleted = effectiveStatus === 'completed';
   const isArchived = effectiveStatus === 'archived';
-  const isExpired = effectiveStatus === 'expired';
-  const isCancelled = effectiveStatus === 'cancelled';
   const isDueSoon = dueSoonReminders.some(r => r.id === b.id);
 
   return (
@@ -560,7 +443,6 @@ function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, a
       }}>
       {isCancelReq && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #E74C3C, transparent)' }} />}
       {isDueSoon && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, #C9A84C, transparent)' }} />}
-      {(isExpired || isCancelled) && <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg, rgba(255,255,255,0.1), transparent)' }} />}
 
       <div style={{ padding: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px', marginBottom: '10px' }}>
@@ -585,18 +467,6 @@ function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, a
         {isDueSoon && (
           <div style={{ fontFamily: 'Jost, sans-serif', fontSize: '10px', color: '#C9A84C', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Bell size={9} /> RDV proche — rappel recommandé
-          </div>
-        )}
-
-        {/* Restore hint for expired/archived/cancelled */}
-        {(isExpired || isArchived || isCancelled) && (
-          <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <motion.button
-              whileTap={{ scale: 0.96 }}
-              onClick={(e) => { e.stopPropagation(); setRestoreModal(b); }}
-              style={{ padding: '5px 12px', background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.2)', color: '#25D366', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '10px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', letterSpacing: '0.05em' }}>
-              <RotateCcw size={9} /> Restaurer
-            </motion.button>
           </div>
         )}
       </div>
@@ -670,53 +540,16 @@ function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, a
                 </button>
               )}
 
-              {/* Expiré : restaurer ou archiver */}
-              {isExpired && (
-                <>
-                  <button
-                    onClick={() => setRestoreModal(b)}
-                    style={{ padding: '8px 14px', background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)', color: '#25D366', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <RotateCcw size={11} /> Restaurer
-                  </button>
-                  <button onClick={() => archiveBooking(b)} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#8A7968', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Archive size={11} /> Archiver
-                  </button>
-                </>
-              )}
-
-              {/* Annulé : restaurer ou archiver */}
-              {isCancelled && (
-                <>
-                  <button
-                    onClick={() => setRestoreModal(b)}
-                    style={{ padding: '8px 14px', background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)', color: '#25D366', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <RotateCcw size={11} /> Restaurer
-                  </button>
-                  <button onClick={() => archiveBooking(b)} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#8A7968', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Archive size={11} /> Archiver
-                  </button>
-                </>
-              )}
-
-              {/* Terminé : archiver */}
-              {isCompleted && (
+              {['cancelled', 'expired', 'completed'].includes(effectiveStatus) && (
                 <button onClick={() => archiveBooking(b)} style={{ padding: '8px 14px', background: 'transparent', border: '1px solid rgba(255,255,255,0.08)', color: '#8A7968', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <Archive size={11} /> Archiver
                 </button>
               )}
 
-              {/* Archivé : restaurer ou supprimer */}
               {isArchived && (
-                <>
-                  <button
-                    onClick={() => setRestoreModal(b)}
-                    style={{ padding: '8px 14px', background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)', color: '#25D366', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <RotateCcw size={11} /> Restaurer
-                  </button>
-                  <button onClick={() => deleteBookingPermanently(b)} style={{ padding: '8px 14px', background: 'rgba(231,76,60,0.06)', border: '1px solid rgba(231,76,60,0.15)', color: '#E74C3C', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <Trash2 size={11} /> Supprimer
-                  </button>
-                </>
+                <button onClick={() => deleteBookingPermanently(b)} style={{ padding: '8px 14px', background: 'rgba(231,76,60,0.06)', border: '1px solid rgba(231,76,60,0.15)', color: '#E74C3C', borderRadius: '4px', fontFamily: 'Jost, sans-serif', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Trash2 size={11} /> Supprimer
+                </button>
               )}
             </div>
 
@@ -725,11 +558,6 @@ function BookingCard({ b, dueSoonReminders, setEditModal, updateBookingStatus, a
               {b.createdAt?.toDate && (
                 <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '9px', color: '#444' }}>
                   Créé : {format(b.createdAt.toDate(), 'dd/MM/yy HH:mm')}
-                </span>
-              )}
-              {b.restoredAt?.toDate && (
-                <span style={{ fontFamily: 'Jost, sans-serif', fontSize: '9px', color: '#25D366', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                  <RotateCcw size={8} /> Restauré : {format(b.restoredAt.toDate(), 'dd/MM/yy HH:mm')}
                 </span>
               )}
             </div>
@@ -762,7 +590,6 @@ export default function Admin() {
   const [proofViewer, setProofViewer] = useState(null);
   const [historyModal, setHistoryModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
-  const [restoreModal, setRestoreModal] = useState(null);
 
   const [statusFilter, setStatusFilter] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -818,6 +645,7 @@ export default function Admin() {
         });
         await freeSlotInAvailability(b.date, b.time);
         await addBookingHistory(b.id, 'Expiré automatiquement (délai paiement dépassé)');
+        // ── NOUVEAU : notifier le client par WhatsApp que son RDV a expiré ──
         notifyWA(b, 'expired');
         toast(`⏱ RDV de ${b.name} expiré automatiquement`, { icon: '🕐' });
       }
@@ -947,49 +775,6 @@ export default function Admin() {
     toast.success('Réservation supprimée');
   };
 
-  // ─── RESTORE BOOKING ────────────────────────────────────────────────────────
-  const restoreBooking = async (booking, targetStatus, sendWA) => {
-    // Vérifier si le créneau est déjà pris par une autre réservation active
-    const conflicting = bookings.find(x =>
-      x.id !== booking.id &&
-      x.date === booking.date &&
-      x.time === booking.time &&
-      !isInactive(x)
-    );
-    if (conflicting) {
-      toast.error(`⚠️ Le créneau ${booking.time} le ${booking.date} est déjà pris par ${conflicting.name}. Modifiez d'abord le créneau.`);
-      setRestoreModal(null);
-      return;
-    }
-
-    // Occuper le créneau dans availability (le retirer des dispo libres)
-    await occupySlotInAvailability(booking.date, booking.time);
-
-    // Mettre à jour le statut
-    await updateDoc(doc(db, 'bookings', booking.id), {
-      status: targetStatus,
-      statutReservation: targetStatus,
-      restoredAt: serverTimestamp(),
-      archivedAt: null,
-      autoExpiredAt: null,
-      cancelledByAdmin: null,
-      reminderSent: false,
-      updatedAt: serverTimestamp(),
-    });
-
-    await addBookingHistory(booking.id, `Restauré par l'admin → ${STATUS_LABEL[targetStatus]}`, {
-      créneau: `${booking.date} ${booking.time}`,
-    });
-
-    // Notifier le client si demandé
-    if (sendWA) {
-      notifyWA(booking, 'restored');
-    }
-
-    toast.success(`✅ ${booking.name} restauré — ${STATUS_LABEL[targetStatus]}`);
-    setRestoreModal(null);
-  };
-
   const handleReassign = async () => {
     if (!newSlotDate || !newSlotTime) { toast.error('Choisissez une date et une heure'); return; }
     const { booking } = reassignModal;
@@ -1070,6 +855,7 @@ export default function Admin() {
     const montantPayeNum = form.montantPaye ? Number(form.montantPaye) : getMontantPaye(b);
     const montantTotalNum = form.montantTotal ? Number(form.montantTotal) : getMontantTotal(b);
     const resteNum = Math.max(0, montantTotalNum - montantPayeNum);
+    const statusFR = STATUS_NORMALIZE[form.status] ? form.status : (Object.entries(STATUS_NORMALIZE).find(([, v]) => v === form.status)?.[0] || form.status);
     await updateDoc(doc(db, 'bookings', b.id), {
       name: form.name, phone: form.phone, service: form.service,
       date: form.date, time: form.time,
@@ -1576,7 +1362,6 @@ export default function Admin() {
                       archiveBooking={archiveBooking}
                       deleteBookingPermanently={deleteBookingPermanently}
                       setProofViewer={setProofViewer}
-                      setRestoreModal={setRestoreModal}
                     />
                   ))}
                 </div>
@@ -1675,17 +1460,6 @@ export default function Admin() {
             availability={availability}
             onClose={() => setEditModal(null)}
             onSave={handleEditSave}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* ─── Restore modal ─── */}
-      <AnimatePresence>
-        {restoreModal && (
-          <RestoreModal
-            booking={restoreModal}
-            onClose={() => setRestoreModal(null)}
-            onRestore={restoreBooking}
           />
         )}
       </AnimatePresence>
